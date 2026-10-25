@@ -117,6 +117,7 @@ curl -s https://licop2022.github.io/lecture-radar/ | grep -c first_seen   # 数�
 
 | 现象 | 原因 | 处理 |
 | --- | --- | --- |
+| `git clone` 报 `schannel: failed to receive handshake` | 网络需要代理，但新克隆里还没有任何代理配置 | `HTTPS_PROXY=http://127.0.0.1:端口 git clone https://github.com/Licop2022/lecture-radar.git`，或先 `git config --global http.proxy http://127.0.0.1:端口` |
 | `找不到 Python 3.8+ 解释器` | Python 没装或没进 PATH | 重装并勾选 Add to PATH；或用 `py` 启动器 |
 | `推送失败` + `CONNECT tunnel failed` | 需要代理但没配 | `git config http.proxy http://127.0.0.1:端口` |
 | `Authentication failed` | token 过期 / 权限不足 | 重新生成 PAT，确认 Contents 是 Read and write |
