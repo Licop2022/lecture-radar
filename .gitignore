@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 本地临时数据
+data/patch-*.json
+data/tmp*.json
+data/runs.log
+
+# 归档的历史库（体积大且非必需，按需保留）
+data/archive/
+
+# 本地工作记忆（含个人偏好，不入库）
+.workbuddy/
+
+# 系统
+.DS_Store
+Thumbs.db
+desktop.ini
