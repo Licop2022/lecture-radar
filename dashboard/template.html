@@ -81,7 +81,7 @@
   }
   .search input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
   .search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);opacity:.4}
-  .seg{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff}
+  .seg{display:flex;flex:0 0 auto;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff}
   .seg button{
     border:none;background:none;padding:7px 12px;font-size:12.5px;color:var(--ink-2);
     cursor:pointer;font-family:inherit;transition:all .14s;
@@ -234,7 +234,8 @@
     .sidefoot{display:none}
     main{padding:0 14px 50px}
     .topbar{padding:12px 0}
-    .grid{grid-template-columns:1fr}
+    .search{flex:1 1 100%}
+    .grid{grid-template-columns:minmax(0,1fr)}
     .dayhead{top:0}
   }
 </style>
@@ -488,7 +489,7 @@ function render(){
 function renderStats(){
   const today = DATA.filter(r=>daysFromToday(r.date)===0).length;
   const week = DATA.filter(r=>{const n=daysFromToday(r.date);return n!==null&&n>=0&&n<=7;}).length;
-  const credit = DATA.filter(r=>!!r.credit && (daysFromToday(r.date)===null || daysFromToday(r.date)>=0)).length;
+  const credit = DATA.filter(r=>!!r.credit).length;
   const fresh = DATA.filter(r=>r.is_new).length;
   document.getElementById("stats").innerHTML = `
     <div class="stat"><div class="n">${DATA.length}</div><div class="k">累计收录</div></div>

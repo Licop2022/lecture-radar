@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>讲座雷达 · 公众号讲座信息汇总</title>
+<style>
+  :root{
+    --bg:#f6f6f3;
+    --card:#ffffff;
+    --ink:#1b2330;
+    --ink-2:#4a5568;
+    --ink-3:#8b95a5;
+    --line:#e4e4de;
+    --accent:#1f5c53;
+    --accent-soft:#e7f1ef;
+    --warn:#b45309;
+    --warn-soft:#fdf1e3;
+    --credit:#4338ca;
+    --credit-soft:#eef0ff;
+    --radius:14px;
+    --side:236px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg);color:var(--ink);
+    font-family:"PingFang SC","Microsoft YaHei","Hiragino Sans GB","Source Han Sans SC",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased;
+  }
+  .app{display:flex;min-height:100vh}
+
+  /* ---------- sidebar ---------- */
+  .side{
+    width:var(--side);flex:0 0 var(--side);
+    border-right:1px solid var(--line);
+    background:#fbfbf9;
+    padding:22px 16px 18px;
+    position:sticky;top:0;height:100vh;overflow-y:auto;
+  }
+  .brand{display:flex;align-items:baseline;gap:7px;padding:0 6px 16px}
+  .brand b{font-size:18px;letter-spacing:-.3px}
+  .brand span{font-size:11px;color:var(--ink-3)}
+  .navgroup{margin-bottom:18px}
+  .navgroup h3{
+    font-size:10.5px;font-weight:600;color:var(--ink-3);
+    letter-spacing:1.2px;text-transform:uppercase;
+    margin:0 0 6px;padding:0 8px;
+  }
+  .navitem{
+    display:flex;align-items:center;gap:8px;
+    padding:6px 9px;border-radius:8px;cursor:pointer;
+    font-size:13px;color:var(--ink-2);
+    border:none;background:none;width:100%;text-align:left;font-family:inherit;
+    transition:background .14s,color .14s;
+  }
+  .navitem:hover{background:#f0f0eb;color:var(--ink)}
+  .navitem.on{background:var(--accent);color:#fff}
+  .navitem.on .cnt{color:rgba(255,255,255,.78)}
+  .navitem .dot{width:6px;height:6px;border-radius:50%;flex:0 0 6px;background:currentColor;opacity:.4}
+  .navitem.on .dot{opacity:1;background:#fff}
+  .navitem .cnt{margin-left:auto;font-size:11.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+  .sidefoot{
+    margin-top:22px;padding:12px 8px 0;border-top:1px solid var(--line);
+    font-size:11px;color:var(--ink-3);line-height:1.75;
+  }
+
+  /* ---------- main ---------- */
+  main{flex:1;min-width:0;padding:0 28px 60px}
+  .topbar{
+    position:sticky;top:0;z-index:20;
+    background:rgba(246,246,243,.94);backdrop-filter:blur(8px);
+    padding:18px 0 12px;border-bottom:1px solid var(--line);
+    display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+  }
+  .search{flex:1 1 240px;min-width:170px;position:relative}
+  .search input{
+    width:100%;padding:9px 12px 9px 34px;
+    border:1px solid var(--line);border-radius:10px;background:#fff;
+    font-size:13px;color:var(--ink);outline:none;font-family:inherit;
+  }
+  .search input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);opacity:.4}
+  .seg{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff}
+  .seg button{
+    border:none;background:none;padding:7px 12px;font-size:12.5px;color:var(--ink-2);
+    cursor:pointer;font-family:inherit;transition:all .14s;
+  }
+  .seg button+button{border-left:1px solid var(--line)}
+  .seg button.on{background:var(--accent);color:#fff}
+  .btn{
+    border:1px solid var(--line);background:#fff;border-radius:9px;
+    padding:8px 13px;font-size:12.5px;color:var(--ink-2);cursor:pointer;
+    font-family:inherit;white-space:nowrap;transition:all .14s;
+  }
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+
+  /* ---------- stats ---------- */
+  .stats{display:flex;gap:30px;padding:18px 2px 2px;flex-wrap:wrap}
+  .stat .n{font-size:22px;font-weight:700;letter-spacing:-.5px;font-variant-numeric:tabular-nums;line-height:1.2}
+  .stat .n.hot{color:var(--warn)}
+  .stat .n.cr{color:var(--credit)}
+  .stat .k{font-size:11.5px;color:var(--ink-3)}
+
+  /* ---------- section head ---------- */
+  .sechead{
+    display:flex;align-items:baseline;gap:10px;
+    margin:20px 0 14px;padding-bottom:9px;border-bottom:1px solid var(--line);
+  }
+  .sechead h2{font-size:15px;font-weight:600;margin:0;letter-spacing:-.2px}
+  .sechead .num{font-size:12px;color:var(--ink-3)}
+
+  /* ---------- grid ---------- */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px}
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px 18px;display:flex;gap:15px;
+    transition:box-shadow .18s,transform .18s,border-color .18s;position:relative;
+  }
+  .card:hover{box-shadow:0 6px 22px rgba(27,35,48,.07);transform:translateY(-1px);border-color:#d8d8d0}
+  .card.past{opacity:.6}
+  .card.past:hover{opacity:.85}
+  .datebox{
+    flex:0 0 50px;text-align:center;padding-top:2px;
+    border-right:1px solid var(--line);padding-right:13px;
+  }
+  .datebox .m{font-size:10.5px;color:var(--ink-3);letter-spacing:.8px}
+  .datebox .d{font-size:21px;font-weight:700;line-height:1.15;font-variant-numeric:tabular-nums}
+  .datebox .w{font-size:10.5px;color:var(--ink-3)}
+  .datebox.past .d{color:var(--ink-3)}
+  .body{flex:1;min-width:0}
+  .titlerow{display:flex;gap:7px;align-items:flex-start;margin-bottom:6px}
+  .title{
+    font-size:15px;font-weight:600;line-height:1.45;letter-spacing:-.1px;
+    text-decoration:none;flex:1;min-width:0;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  }
+  a.title:hover{color:var(--accent)}
+  .badge{
+    flex:0 0 auto;font-size:10.5px;padding:2px 7px;border-radius:6px;font-weight:600;
+    background:var(--accent-soft);color:var(--accent);white-space:nowrap;
+  }
+  .badge.today{background:var(--warn-soft);color:var(--warn)}
+  .badge.past{background:#f0f0ec;color:var(--ink-3)}
+  .badge.new{background:#fff4e5;color:#c2410c}
+  .badge.credit{background:var(--credit-soft);color:var(--credit)}
+  .meta{display:flex;flex-direction:column;gap:2px;margin-bottom:7px}
+  .meta div{font-size:12.5px;color:var(--ink-2);display:flex;gap:7px;align-items:baseline}
+  .meta .k{color:var(--ink-3);flex:0 0 auto;min-width:32px}
+  .meta .v{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .summary{
+    font-size:12.5px;color:var(--ink-3);line-height:1.65;margin:0 0 8px;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  }
+  .foot{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .cat{
+    font-size:10.5px;padding:1px 7px;border-radius:5px;
+    border:1px solid var(--line);color:var(--ink-2);background:#fafaf7;
+  }
+  .cat.c0{border-color:#cfe3df;background:#eef5f3;color:#1f5c53}
+  .cat.c1{border-color:#dcdcf8;background:#f2f2fd;color:#4338ca}
+  .cat.c2{border-color:#cfe0f4;background:#eef4fc;color:#1d4ed8}
+  .cat.c3{border-color:#f4e0c7;background:#fdf4e8;color:#b45309}
+  .cat.c4{border-color:#f3d3d8;background:#fdf0f2;color:#be123c}
+  .tag{font-size:10.5px;padding:1px 7px;border-radius:5px;background:#f3f4f1;color:var(--ink-2);border:1px solid #eaeae4}
+  .src{font-size:11px;color:var(--ink-3);margin-left:auto;display:flex;gap:5px;align-items:center}
+  .src a{color:var(--accent);text-decoration:none;border-bottom:1px dotted rgba(31,92,83,.4)}
+  .src a:hover{border-bottom-style:solid}
+
+  /* ---------- timeline ---------- */
+  .daygroup{margin-bottom:22px}
+  .dayhead{
+    display:flex;align-items:center;gap:10px;margin-bottom:9px;
+    position:sticky;top:66px;background:rgba(246,246,243,.95);
+    padding:5px 0;backdrop-filter:blur(6px);z-index:5;
+  }
+  .dayhead .dd{font-size:14px;font-weight:700;letter-spacing:-.2px}
+  .dayhead .dw{font-size:11.5px;color:var(--ink-3)}
+  .dayhead .rel{
+    font-size:10.5px;padding:1px 7px;border-radius:5px;
+    background:var(--warn-soft);color:var(--warn);font-weight:600;
+  }
+  .dayhead .ln{flex:1;height:1px;background:var(--line)}
+  .tl{display:flex;flex-direction:column;gap:10px}
+
+  /* ---------- table ---------- */
+  .tblwrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;background:var(--card);
+    border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;font-size:12.5px}
+  th{
+    text-align:left;font-weight:600;font-size:11px;color:var(--ink-3);
+    letter-spacing:.4px;padding:10px 12px;background:#fafaf7;border-bottom:1px solid var(--line);
+    white-space:nowrap;
+  }
+  td{padding:10px 12px;border-bottom:1px solid #f0f0ea;vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:#fcfcfa}
+  td.t{white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--ink-2)}
+  td.n a{text-decoration:none;font-weight:500}
+  td.n a:hover{color:var(--accent);text-decoration:underline}
+  td.dim{color:var(--ink-3)}
+
+  /* ---------- empty / footer ---------- */
+  .empty{
+    text-align:center;padding:70px 20px;color:var(--ink-3);
+    border:1px dashed var(--line);border-radius:var(--radius);background:#fff;
+  }
+  .empty .big{font-size:15px;color:var(--ink-2);margin-bottom:5px}
+  footer{
+    margin-top:34px;padding-top:16px;border-top:1px solid var(--line);
+    font-size:11px;color:var(--ink-3);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  }
+  .toast{
+    position:fixed;left:50%;bottom:34px;transform:translateX(-50%) translateY(18px);
+    background:var(--ink);color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;
+    opacity:0;pointer-events:none;transition:all .24s;z-index:99;
+  }
+  .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* ---------- responsive ---------- */
+  @media(max-width:900px){
+    .app{flex-direction:column}
+    .side{
+      width:100%;flex:none;height:auto;position:static;
+      border-right:none;border-bottom:1px solid var(--line);
+      padding:14px 16px 6px;
+    }
+    .brand{padding-bottom:10px}
+    .navgroup{margin-bottom:8px;display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+    .navgroup::-webkit-scrollbar{display:none}
+    .navgroup h3{display:none}
+    .navitem{width:auto;flex:0 0 auto;white-space:nowrap;border:1px solid var(--line);background:#fff}
+    .navitem .cnt{margin-left:4px}
+    .sidefoot{display:none}
+    main{padding:0 14px 50px}
+    .topbar{padding:12px 0}
+    .grid{grid-template-columns:1fr}
+    .dayhead{top:0}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="side">
+    <div class="brand"><b>讲座雷达</b><span>广工 · 全校</span></div>
+    <nav id="nav"><div class="navgroup"><h3>时间</h3>
+      <button class="navitem on" data-nav="all">
+        <span class="dot"></span><span>全部讲座</span><span class="cnt">6</span>
+      </button>
+      <button class="navitem " data-nav="today">
+        <span class="dot"></span><span>今天</span><span class="cnt">0</span>
+      </button>
+      <button class="navitem " data-nav="tomorrow">
+        <span class="dot"></span><span>明天</span><span class="cnt">0</span>
+      </button>
+      <button class="navitem " data-nav="week">
+        <span class="dot"></span><span>未来 7 天</span><span class="cnt">1</span>
+      </button>
+      <button class="navitem " data-nav="past">
+        <span class="dot"></span><span>已结束</span><span class="cnt">2</span>
+      </button></div><div class="navgroup"><h3>学分条</h3>
+      <button class="navitem " data-nav="credit">
+        <span class="dot"></span><span>有学术条 / 实践条</span><span class="cnt">1</span>
+      </button></div><div class="navgroup"><h3>类型</h3>
+      <button class="navitem " data-nav="cat:学术报告">
+        <span class="dot"></span><span>学术报告</span><span class="cnt">1</span>
+      </button>
+      <button class="navitem " data-nav="cat:学术会议">
+        <span class="dot"></span><span>学术会议</span><span class="cnt">2</span>
+      </button>
+      <button class="navitem " data-nav="cat:论坛会议">
+        <span class="dot"></span><span>论坛会议</span><span class="cnt">3</span>
+      </button></div><div class="navgroup"><h3>来源</h3>
+      <button class="navitem " data-nav="src:wechat">
+        <span class="dot"></span><span>公众号</span><span class="cnt">2</span>
+      </button>
+      <button class="navitem " data-nav="src:web">
+        <span class="dot"></span><span>学校官网</span><span class="cnt">4</span>
+      </button></div></nav>
+    <div class="sidefoot" id="sidefoot">更新于<br>2026-10-25 23:09<br><br>来源 27 个<br>共 6 条记录</div>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <div class="search">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1b2330" stroke-width="2.4"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4.2-4.2"></path></svg>
+        <input id="q" type="search" placeholder="搜标题、主讲人、地点、主办…">
+      </div>
+      <div class="seg" id="views">
+        <button data-view="grid" class="on">卡片</button>
+        <button data-view="timeline">时间轴</button>
+        <button data-view="table">表格</button>
+      </div>
+      <button class="btn" id="copyBtn">复制简报</button>
+    </div>
+
+    <div class="stats" id="stats">
+    <div class="stat"><div class="n">6</div><div class="k">累计收录</div></div>
+    <div class="stat"><div class="n ">0</div><div class="k">今天开讲</div></div>
+    <div class="stat"><div class="n">1</div><div class="k">未来 7 天</div></div>
+    <div class="stat"><div class="n ">0</div><div class="k">带学分条</div></div>
+    <div class="stat"><div class="n hot">6</div><div class="k">24h 新增</div></div></div>
+    <div id="content"><div class="sechead"><h2>全部讲座</h2><span class="num">6 条</span></div><div class="grid"><article class="card ">
+    <div class="datebox ">
+      <div class="m">10月</div><div class="d">30</div><div class="w">周五</div>
+    </div>
+    <div class="body">
+      <div class="titlerow"><a class="title" href="https://m.sohu.com/a/1088275171_121118938" target="_blank" rel="noopener">中国自动化大会 CAC2026 ·「具身智能与空间计算」平行会议</a><span class="badge new">新</span><span class="badge ">5天后</span></div>
+      <div class="meta"><div><span class="k">主讲</span><span class="v">徐雍（广工自动化学院院长）、李攀硕（广工自动化学院教授）任会议主席</span></div><div><span class="k">时间</span><span class="v">2026年10月30日-11月1日</span></div><div><span class="k">地点</span><span class="v">北京首都国际会议中心（北京市顺义区裕东路55号）</span></div><div><span class="k">主办</span><span class="v">中国自动化学会（恰逢学会成立65周年，设50余场平行会议）</span></div></div>
+      <p class="summary">自动化领域年度大会。徐雍、李攀硕两位学院老师主持「具身智能与空间计算」平行会议，聚焦具身智能、空间感知、自主决策与人机协同，覆盖航天探测、海洋机器人、科学智能、医疗健康等场景。</p>
+      <div class="foot"><span class="cat c2">学术会议</span><span class="tag">强相关</span><span class="tag">自动化</span><span class="src">CAC2026 平行会议预告 <a href="https://m.sohu.com/a/1088275171_121118938" target="_blank" rel="noopener">原文 ↗</a></span></div>
+    </div>
+  </article><article class="card ">
+    <div class="datebox ">
+      <div class="m">11月</div><div class="d">06</div><div class="w">周五</div>
+    </div>
+    <div class="body">
+      <div class="titlerow"><a class="title" href="https://atc.gdut.edu.cn/info/1036/3429.htm" target="_blank" rel="noopener">第二届先进分析测试技术研讨会</a><span class="badge new">新</span><span class="badge ">12天后</span></div>
+      <div class="meta"><div><span class="k">主讲</span><span class="v">业内知名专家学者（详见会议议程与附件）</span></div><div><span class="k">时间</span><span class="v">2026年11月6日（周五）8:30-17:00</span></div><div><span class="k">地点</span><span class="v">大会报告：大学城校区大讲堂圆弧报告厅；技术研讨：立德科技楼B座分析测试中心</span></div><div><span class="k">主办</span><span class="v">广东工业大学分析测试中心、广东省分析测试协会</span></div></div>
+      <p class="summary">主题「交叉融合，服务一流」，聚焦先进分析测试技术前沿与趋势。欢迎师生、用户、校友参加，联系人陈雨婷老师 39262997。</p>
+      <div class="foot"><span class="cat c1">论坛会议</span><span class="tag">校内会议</span><span class="tag">分析测试</span><span class="src">广工分析测试中心通知 <a href="https://atc.gdut.edu.cn/info/1036/3429.htm" target="_blank" rel="noopener">原文 ↗</a></span></div>
+    </div>
+  </article><article class="card ">
+    <div class="datebox ">
+      <div class="m">11月</div><div class="d">13</div><div class="w">周五</div>
+    </div>
+    <div class="body">
+      <div class="titlerow"><a class="title" href="https://jjxy.gdut.edu.cn/info/1081/7587.htm" target="_blank" rel="noopener">第十二届人工智能发展与治理产学研论坛（2026）</a><span class="badge new">新</span><span class="badge ">19天后</span></div>
+      <div class="meta"><div><span class="k">主讲</span><span class="v">待公布</span></div><div><span class="k">时间</span><span class="v">2026年11月13-14日</span></div><div><span class="k">地点</span><span class="v">广州白云国际会议中心</span></div><div><span class="k">主办</span><span class="v">广东工业大学、中国工业经济学会数字化与创新学科专委会、广工经济学院等</span></div></div>
+      <p class="summary">主题「人工智能发展与治理」，设大会报告与平行论坛。征文截止后进入议程发布阶段，可关注后续通知。</p>
+      <div class="foot"><span class="cat c1">论坛会议</span><span class="tag">人工智能</span><span class="tag">论坛</span><span class="src">广工经济学院征文启事 <a href="https://jjxy.gdut.edu.cn/info/1081/7587.htm" target="_blank" rel="noopener">原文 ↗</a></span></div>
+    </div>
+  </article><article class="card ">
+    <div class="datebox ">
+      <div class="m">11月</div><div class="d">20</div><div class="w">周五</div>
+    </div>
+    <div class="body">
+      <div class="titlerow"><a class="title" href="https://glxy.gdut.edu.cn/info/1091/31157.htm" target="_blank" rel="noopener">第十届能源资源系统工程学术年会</a><span class="badge new">新</span><span class="badge ">26天后</span></div>
+      <div class="meta"><div><span class="k">主讲</span><span class="v">待公布</span></div><div><span class="k">时间</span><span class="v">2026年11月20-22日</span></div><div><span class="k">地点</span><span class="v">广州（具体会场见后续通知）</span></div><div><span class="k">主办</span><span class="v">中国系统工程学会能源资源系统工程专委会、广东工业大学（管理学院承办）</span></div></div>
+      <p class="summary">围绕「AI 时代的能源转型与能源安全」组织大会报告、平行报告、特邀报告与院长论坛。征文截止 10 月 25 日。</p>
+      <div class="foot"><span class="cat c2">学术会议</span><span class="tag">能源</span><span class="tag">学术年会</span><span class="src">广工管理学院第三轮通知 <a href="https://glxy.gdut.edu.cn/info/1091/31157.htm" target="_blank" rel="noopener">原文 ↗</a></span></div>
+    </div>
+  </article><article class="card past">
+    <div class="datebox past">
+      <div class="m">10月</div><div class="d">24</div><div class="w">周六</div>
+    </div>
+    <div class="body">
+      <div class="titlerow"><a class="title" href="http://mp.weixin.qq.com/s?__biz=MzA5MTk4NTk3NA==&amp;mid=2651821277&amp;idx=1&amp;sn=d44b69e3d859b1a03b54c413bbdb6d4d" target="_blank" rel="noopener">第二届粤港澳文化遗产教育创新论坛</a><span class="badge credit">学术条</span><span class="badge past">已结束</span></div>
+      <div class="meta"><div><span class="k">主讲</span><span class="v">李凤亮、宋俊华、赵伟兵、薛帆等</span></div><div><span class="k">时间</span><span class="v">2026年10月24日（周六）9:00-17:15</span></div><div><span class="k">地点</span><span class="v">大学城校区大讲堂报告厅（分论坛：圆弧报告厅等）</span></div><div><span class="k">主办</span><span class="v">广东工业大学主办；通识教育中心、文化素质教育中心承办</span></div></div>
+      <p class="summary">主题「以教育为桥：文化遗产与社会创新」，设「文化遗产的AI再生」等三个分论坛。研究生/博士生参会可获学术条，需线上报名+现场签到签退。</p>
+      <div class="foot"><span class="cat c1">论坛会议</span><span class="tag">有学术条</span><span class="tag">论坛</span><span class="src">广工通识教育 <a href="http://mp.weixin.qq.com/s?__biz=MzA5MTk4NTk3NA==&amp;mid=2651821277&amp;idx=1&amp;sn=d44b69e3d859b1a03b54c413bbdb6d4d" target="_blank" rel="noopener">原文 ↗</a></span></div>
+    </div>
+  </article><article class="card past">
+    <div class="datebox past">
+      <div class="m">10月</div><div class="d">20</div><div class="w">周二</div>
+    </div>
+    <div class="body">
+      <div class="titlerow"><a class="title" href="http://mp.weixin.qq.com/s?__biz=Mzg2ODUyNjc3Mg==&amp;mid=2247593716&amp;idx=1&amp;sn=ac3f42aa3ab01edd94d7ce4b0395d549" target="_blank" rel="noopener">广东工业大学「卓越大讲堂」（第二十五讲）：青藏高原冰岩崩的“基因密码”</a><span class="badge past">已结束</span></div>
+      <div class="meta"><div><span class="k">主讲</span><span class="v">彭建兵 中国科学院院士（长安大学 / 中国地质大学(北京)）</span></div><div><span class="k">时间</span><span class="v">2026年10月20日（周二）9:30</span></div><div><span class="k">地点</span><span class="v">大学城校区大讲堂圆弧报告厅</span></div><div><span class="k">主办</span><span class="v">研究生院、校团委、土木与交通工程学院、粤港澳大湾区防灾减灾研究院</span></div></div>
+      <p class="summary">以 2026 年 8·26 西藏吉隆口岸冰岩崩泥石流灾害为切入，提出构造开裂—隆升扩裂—地震震裂—冻触劈裂的四力递进耦合模型。</p>
+      <div class="foot"><span class="cat c0">学术报告</span><span class="tag">院士讲座</span><span class="tag">卓越大讲堂</span><span class="src">广工研招办（广东工业大学研究生招生） <a href="http://mp.weixin.qq.com/s?__biz=Mzg2ODUyNjc3Mg==&amp;mid=2247593716&amp;idx=1&amp;sn=ac3f42aa3ab01edd94d7ce4b0395d549" target="_blank" rel="noopener">原文 ↗</a></span></div>
+    </div>
+  </article></div></div>
+
+    <footer>
+      <span id="footL">数据更新 2026-10-25 23:09</span>
+      <span id="footR">范围：全校 · 关注 27 个来源</span>
+    </footer>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const DATA = [{"title": "广东工业大学「卓越大讲堂」（第二十五讲）：青藏高原冰岩崩的“基因密码”", "speaker": "彭建兵 中国科学院院士（长安大学 / 中国地质大学(北京)）", "date": "2026-10-20", "time_text": "2026年10月20日（周二）9:30", "location": "大学城校区大讲堂圆弧报告厅", "org": "研究生院、校团委、土木与交通工程学院、粤港澳大湾区防灾减灾研究院", "source": "广工研招办（广东工业大学研究生招生）", "url": "http://mp.weixin.qq.com/s?__biz=Mzg2ODUyNjc3Mg==&mid=2247593716&idx=1&sn=ac3f42aa3ab01edd94d7ce4b0395d549", "summary": "以 2026 年 8·26 西藏吉隆口岸冰岩崩泥石流灾害为切入，提出构造开裂—隆升扩裂—地震震裂—冻触劈裂的四力递进耦合模型。", "tags": ["院士讲座", "卓越大讲堂"], "id": "9372e9ffe961", "first_seen": "2026-10-25T23:06:30+08:00", "last_seen": "2026-10-25T23:06:30+08:00", "category": "学术报告", "src_type": "wechat", "status": "past", "status_text": "已结束", "is_new": true}, {"title": "第二届粤港澳文化遗产教育创新论坛", "speaker": "李凤亮、宋俊华、赵伟兵、薛帆等", "date": "2026-10-24", "time_text": "2026年10月24日（周六）9:00-17:15", "location": "大学城校区大讲堂报告厅（分论坛：圆弧报告厅等）", "org": "广东工业大学主办；通识教育中心、文化素质教育中心承办", "source": "广工通识教育", "url": "http://mp.weixin.qq.com/s?__biz=MzA5MTk4NTk3NA==&mid=2651821277&idx=1&sn=d44b69e3d859b1a03b54c413bbdb6d4d", "summary": "主题「以教育为桥：文化遗产与社会创新」，设「文化遗产的AI再生」等三个分论坛。研究生/博士生参会可获学术条，需线上报名+现场签到签退。", "tags": ["有学术条", "论坛", "通识教育"], "id": "3f44d2a65301", "first_seen": "2026-10-25T23:06:30+08:00", "last_seen": "2026-10-25T23:09:17+08:00", "credit": "学术条", "category": "论坛会议", "src_type": "wechat", "status": "past", "status_text": "已结束", "is_new": true}, {"title": "中国自动化大会 CAC2026 ·「具身智能与空间计算」平行会议", "speaker": "徐雍（广工自动化学院院长）、李攀硕（广工自动化学院教授）任会议主席", "date": "2026-10-30", "time_text": "2026年10月30日-11月1日", "location": "北京首都国际会议中心（北京市顺义区裕东路55号）", "org": "中国自动化学会（恰逢学会成立65周年，设50余场平行会议）", "source": "CAC2026 平行会议预告", "url": "https://m.sohu.com/a/1088275171_121118938", "summary": "自动化领域年度大会。徐雍、李攀硕两位学院老师主持「具身智能与空间计算」平行会议，聚焦具身智能、空间感知、自主决策与人机协同，覆盖航天探测、海洋机器人、科学智能、医疗健康等场景。", "tags": ["强相关", "自动化", "学术会议"], "id": "256cfcff8a31", "first_seen": "2026-10-25T23:06:30+08:00", "last_seen": "2026-10-25T23:06:30+08:00", "category": "学术会议", "src_type": "web", "status": "upcoming", "status_text": "5天后", "is_new": true}, {"title": "第二届先进分析测试技术研讨会", "speaker": "业内知名专家学者（详见会议议程与附件）", "date": "2026-11-06", "time_text": "2026年11月6日（周五）8:30-17:00", "location": "大会报告：大学城校区大讲堂圆弧报告厅；技术研讨：立德科技楼B座分析测试中心", "org": "广东工业大学分析测试中心、广东省分析测试协会", "source": "广工分析测试中心通知", "url": "https://atc.gdut.edu.cn/info/1036/3429.htm", "summary": "主题「交叉融合，服务一流」，聚焦先进分析测试技术前沿与趋势。欢迎师生、用户、校友参加，联系人陈雨婷老师 39262997。", "tags": ["校内会议", "分析测试"], "id": "309334d39b41", "first_seen": "2026-10-25T23:06:30+08:00", "last_seen": "2026-10-25T23:06:30+08:00", "category": "论坛会议", "src_type": "web", "status": "upcoming", "status_text": "12天后", "is_new": true}, {"title": "第十二届人工智能发展与治理产学研论坛（2026）", "speaker": "待公布", "date": "2026-11-13", "time_text": "2026年11月13-14日", "location": "广州白云国际会议中心", "org": "广东工业大学、中国工业经济学会数字化与创新学科专委会、广工经济学院等", "source": "广工经济学院征文启事", "url": "https://jjxy.gdut.edu.cn/info/1081/7587.htm", "summary": "主题「人工智能发展与治理」，设大会报告与平行论坛。征文截止后进入议程发布阶段，可关注后续通知。", "tags": ["人工智能", "论坛"], "id": "1ca2b7dea921", "first_seen": "2026-10-25T23:06:30+08:00", "last_seen": "2026-10-25T23:06:30+08:00", "category": "论坛会议", "src_type": "web", "status": "upcoming", "status_text": "19天后", "is_new": true}, {"title": "第十届能源资源系统工程学术年会", "speaker": "待公布", "date": "2026-11-20", "time_text": "2026年11月20-22日", "location": "广州（具体会场见后续通知）", "org": "中国系统工程学会能源资源系统工程专委会、广东工业大学（管理学院承办）", "source": "广工管理学院第三轮通知", "url": "https://glxy.gdut.edu.cn/info/1091/31157.htm", "summary": "围绕「AI 时代的能源转型与能源安全」组织大会报告、平行报告、特邀报告与院长论坛。征文截止 10 月 25 日。", "tags": ["能源", "学术年会"], "id": "c93066a61518", "first_seen": "2026-10-25T23:06:30+08:00", "last_seen": "2026-10-25T23:06:30+08:00", "category": "学术会议", "src_type": "web", "status": "upcoming", "status_text": "26天后", "is_new": true}];
+const META = {"updated_at": "2026-10-25T23:09:17+08:00", "rendered_at": "2026-10-25T23:57:43+08:00", "scope": "全校", "watch_count": 27, "watchlist": ["广东工业大学", "广东工业大学研究生院", "广东工业大学研究生招生", "广工研招办", "广东工业大学研究生会", "广工青年汇", "广工通识教育", "广东工业大学图书馆"]};
+
+const WEEK = ["周日","周一","周二","周三","周四","周五","周六"];
+const state = { nav:"all", q:"", view:"grid" };
+
+function parseDate(s){
+  if(!s) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  if(!m) return null;
+  return new Date(+m[1], +m[2]-1, +m[3]);
+}
+function fmtDate(s){
+  const d = parseDate(s);
+  if(!d) return {m:"待定", d:"--", w:""};
+  return { m:(d.getMonth()+1)+"月", d:String(d.getDate()).padStart(2,"0"), w:WEEK[d.getDay()] };
+}
+function daysFromToday(s){
+  const d = parseDate(s);
+  if(!d) return null;
+  const t = new Date(); t.setHours(0,0,0,0);
+  return Math.round((d - t)/86400000);
+}
+function esc(s){
+  return (s||"").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+}
+const CAT_CLASS = {"学术报告":"c0","论坛会议":"c1","学术会议":"c2","宣讲招聘":"c3","学科竞赛":"c4","其他":""};
+
+/* ---------- nav ---------- */
+function navDefs(){
+  const cats = {};
+  DATA.forEach(r=>{ const c = r.category || "其他"; cats[c] = (cats[c]||0)+1; });
+  const order = ["学术报告","学术会议","论坛会议","宣讲招聘","学科竞赛","其他"];
+  const catItems = order.filter(c=>cats[c]).map(c=>({key:"cat:"+c, label:c}));
+  Object.keys(cats).forEach(c=>{ if(!order.includes(c)) catItems.push({key:"cat:"+c, label:c}); });
+  return [
+    { title:"时间", items:[
+      {key:"all", label:"全部讲座"},
+      {key:"today", label:"今天"},
+      {key:"tomorrow", label:"明天"},
+      {key:"week", label:"未来 7 天"},
+      {key:"past", label:"已结束"}
+    ]},
+    { title:"学分条", items:[
+      {key:"credit", label:"有学术条 / 实践条"}
+    ]},
+    { title:"类型", items: catItems },
+    { title:"来源", items:[
+      {key:"src:wechat", label:"公众号"},
+      {key:"src:web", label:"学校官网"}
+    ]}
+  ];
+}
+
+/* ---------- 过滤 ---------- */
+function baseMatch(r){
+  if(state.q){
+    const hay = [r.title,r.speaker,r.location,r.org,r.source,r.category,(r.tags||[]).join(" "),r.summary].join(" ").toLowerCase();
+    if(!hay.includes(state.q.toLowerCase())) return false;
+  }
+  return true;
+}
+function navMatch(r){
+  const k = state.nav, n = daysFromToday(r.date);
+  if(k === "all") return true;
+  if(k === "today") return n === 0;
+  if(k === "tomorrow") return n === 1;
+  if(k === "week") return n !== null && n >= 0 && n <= 7;
+  if(k === "past") return n !== null && n < 0;
+  if(k === "credit") return !!r.credit;
+  if(k.startsWith("cat:")) return (r.category || "其他") === k.slice(4);
+  if(k === "src:wechat") return r.src_type === "wechat";
+  if(k === "src:web") return r.src_type === "web";
+  return true;
+}
+function countFor(key){
+  const save = state.nav; state.nav = key;
+  const n = DATA.filter(r=>baseMatch(r) && navMatch(r)).length;
+  state.nav = save; return n;
+}
+function rows(){
+  return DATA.filter(r=>baseMatch(r) && navMatch(r)).sort((a,b)=>{
+    const oa = a.status === "past" ? 1 : 0, ob = b.status === "past" ? 1 : 0;
+    if(oa !== ob) return oa - ob;
+    const da = parseDate(a.date), db = parseDate(b.date);
+    if(!da && !db) return 0;
+    if(!da) return 1;
+    if(!db) return -1;
+    return oa ? db - da : da - db;
+  });
+}
+
+/* ---------- 组件 ---------- */
+function cardHTML(r){
+  const f = fmtDate(r.date);
+  const isPast = r.status === "past";
+  const badges = [];
+  if(r.credit) badges.push(`<span class="badge credit">${esc(r.credit)}</span>`);
+  if(r.is_new && !isPast) badges.push('<span class="badge new">新</span>');
+  if(!isPast && r.status !== "unknown") badges.push(`<span class="badge ${r.status==='today'?'today':''}">${esc(r.status_text)}</span>`);
+  if(isPast) badges.push('<span class="badge past">已结束</span>');
+
+  const meta = [];
+  if(r.speaker) meta.push(`<div><span class="k">主讲</span><span class="v">${esc(r.speaker)}</span></div>`);
+  if(r.time_text) meta.push(`<div><span class="k">时间</span><span class="v">${esc(r.time_text)}</span></div>`);
+  if(r.location) meta.push(`<div><span class="k">地点</span><span class="v">${esc(r.location)}</span></div>`);
+  if(r.org) meta.push(`<div><span class="k">主办</span><span class="v">${esc(r.org)}</span></div>`);
+
+  const cat = r.category || "其他";
+  const catHTML = `<span class="cat ${CAT_CLASS[cat]||""}">${esc(cat)}</span>`;
+  const tags = (r.tags||[]).slice(0,2).map(t=>`<span class="tag">${esc(t)}</span>`).join("");
+  const titleHTML = r.url
+    ? `<a class="title" href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title)}</a>`
+    : `<span class="title">${esc(r.title)}</span>`;
+  const srcLink = r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">原文 ↗</a>` : "";
+
+  return `<article class="card ${isPast?'past':''}">
+    <div class="datebox ${isPast?'past':''}">
+      <div class="m">${f.m}</div><div class="d">${f.d}</div><div class="w">${f.w}</div>
+    </div>
+    <div class="body">
+      <div class="titlerow">${titleHTML}${badges.join("")}</div>
+      ${meta.length?`<div class="meta">${meta.join("")}</div>`:""}
+      ${r.summary?`<p class="summary">${esc(r.summary)}</p>`:""}
+      <div class="foot">${catHTML}${tags}<span class="src">${esc(r.source||"")} ${srcLink}</span></div>
+    </div>
+  </article>`;
+}
+
+function tableHTML(list){
+  const body = list.map(r=>{
+    const n = daysFromToday(r.date);
+    const dim = (n !== null && n < 0) ? ' style="color:var(--ink-3)"' : '';
+    const tt = (r.time_text||"").replace(/^\d{4}年\d{1,2}月\d{1,2}日\s*/,"");
+    return `<tr>
+      <td class="t">${esc((r.date||"待定").slice(5))}<br><span style="color:var(--ink-3)">${esc(tt)}</span></td>
+      <td class="n"><a href="${esc(r.url||"#")}" target="_blank" rel="noopener"${dim}>${esc(r.title)}</a></td>
+      <td><span class="cat ${CAT_CLASS[r.category||"其他"]||""}">${esc(r.category||"其他")}</span></td>
+      <td>${r.credit?`<span class="badge credit">${esc(r.credit)}</span>`:'<span style="color:var(--ink-3)">—</span>'}</td>
+      <td class="dim">${esc(r.location||"—")}</td>
+      <td class="dim">${esc(r.speaker||"—")}</td>
+    </tr>`;
+  }).join("");
+  return `<div class="tblwrap"><table>
+    <thead><tr><th>日期</th><th>讲座</th><th>类型</th><th>学分条</th><th>地点</th><th>主讲</th></tr></thead>
+    <tbody>${body}</tbody></table></div>`;
+}
+
+/* ---------- 渲染 ---------- */
+function renderNav(){
+  document.getElementById("nav").innerHTML = navDefs().map(g=>{
+    const items = g.items.map(it=>`
+      <button class="navitem ${state.nav===it.key?'on':''}" data-nav="${esc(it.key)}">
+        <span class="dot"></span><span>${esc(it.label)}</span><span class="cnt">${countFor(it.key)}</span>
+      </button>`).join("");
+    return `<div class="navgroup"><h3>${esc(g.title)}</h3>${items}</div>`;
+  }).join("");
+}
+
+function navLabel(){
+  const k = state.nav;
+  if(k.startsWith("cat:")) return "类型 · " + k.slice(4);
+  if(k === "src:wechat") return "来源 · 公众号";
+  if(k === "src:web") return "来源 · 学校官网";
+  if(k === "credit") return "带学术条 / 实践条";
+  return {all:"全部讲座", today:"今天", tomorrow:"明天", week:"未来 7 天", past:"已结束"}[k] || "全部讲座";
+}
+
+function render(){
+  const list = rows();
+  const c = document.getElementById("content");
+
+  if(!list.length){
+    c.innerHTML = `<div class="sechead"><h2>${esc(navLabel())}</h2><span class="num">0 条</span></div>
+      <div class="empty"><div class="big">这里还没有内容</div><div>换个分类或清空搜索试试</div></div>`;
+    return;
+  }
+
+  let inner = "";
+  if(state.view === "grid"){
+    inner = `<div class="grid">${list.map(cardHTML).join("")}</div>`;
+  } else if(state.view === "table"){
+    inner = tableHTML(list);
+  } else {
+    const groups = [];
+    list.forEach(r=>{
+      const key = r.date || "待定";
+      let g = groups.find(x=>x.key===key);
+      if(!g){ g = {key, items:[]}; groups.push(g); }
+      g.items.push(r);
+    });
+    inner = groups.map(g=>{
+      const f = fmtDate(g.key);
+      const n = daysFromToday(g.key);
+      const rel = n===0?"今天":(n===1?"明天":(n===2?"后天":""));
+      return `<div class="daygroup">
+        <div class="dayhead">
+          <span class="dd">${f.m}${f.d}</span>
+          <span class="dw">${f.w}</span>
+          ${rel?`<span class="rel">${rel}</span>`:""}
+          <span class="ln"></span>
+          <span class="dw">${g.items.length} 场</span>
+        </div>
+        <div class="tl">${g.items.map(cardHTML).join("")}</div>
+      </div>`;
+    }).join("");
+  }
+
+  c.innerHTML = `<div class="sechead"><h2>${esc(navLabel())}</h2><span class="num">${list.length} 条</span></div>${inner}`;
+}
+
+function renderStats(){
+  const today = DATA.filter(r=>daysFromToday(r.date)===0).length;
+  const week = DATA.filter(r=>{const n=daysFromToday(r.date);return n!==null&&n>=0&&n<=7;}).length;
+  const credit = DATA.filter(r=>!!r.credit && (daysFromToday(r.date)===null || daysFromToday(r.date)>=0)).length;
+  const fresh = DATA.filter(r=>r.is_new).length;
+  document.getElementById("stats").innerHTML = `
+    <div class="stat"><div class="n">${DATA.length}</div><div class="k">累计收录</div></div>
+    <div class="stat"><div class="n ${today?'hot':''}">${today}</div><div class="k">今天开讲</div></div>
+    <div class="stat"><div class="n">${week}</div><div class="k">未来 7 天</div></div>
+    <div class="stat"><div class="n ${credit?'cr':''}">${credit}</div><div class="k">带学分条</div></div>
+    <div class="stat"><div class="n ${fresh?'hot':''}">${fresh}</div><div class="k">24h 新增</div></div>`;
+}
+
+/* ---------- 简报 ---------- */
+function briefText(){
+  const rs = DATA.filter(r=>{const n=daysFromToday(r.date);return n===0||n===1;})
+    .sort((a,b)=>(parseDate(a.date)||0)-(parseDate(b.date)||0));
+  if(!rs.length) return "近两日没有已收录的讲座。";
+  const head = "【讲座提醒】" + new Date().toLocaleDateString("zh-CN") + "\n";
+  return head + rs.map(r=>{
+    const p = [`${r.date||"待定"} ${(r.time_text||"").replace(/^\d{4}年\d{1,2}月\d{1,2}日\s*/,"")}`.trim()];
+    if(r.speaker) p.push(r.speaker);
+    if(r.location) p.push(r.location);
+    if(r.credit) p.push("【"+r.credit+"】");
+    return `· ${r.title}\n  ${p.join(" | ")}`;
+  }).join("\n");
+}
+
+/* ---------- 事件绑定 ---------- */
+document.getElementById("q").addEventListener("input", e=>{
+  state.q = e.target.value.trim(); renderNav(); render();
+});
+document.getElementById("nav").addEventListener("click", e=>{
+  const b = e.target.closest(".navitem"); if(!b) return;
+  state.nav = b.dataset.nav; renderNav(); render();
+  window.scrollTo({top:0, behavior:"smooth"});
+});
+document.getElementById("views").addEventListener("click", e=>{
+  const b = e.target.closest("button"); if(!b) return;
+  [...document.querySelectorAll("#views button")].forEach(x=>x.classList.toggle("on", x===b));
+  state.view = b.dataset.view; render();
+});
+document.getElementById("copyBtn").addEventListener("click", async ()=>{
+  const text = briefText();
+  try{ await navigator.clipboard.writeText(text); toast("简报已复制"); }
+  catch(_){ window.prompt("手动复制：", text); }
+});
+function toast(msg){
+  const el = document.getElementById("toast");
+  el.textContent = msg; el.classList.add("on");
+  setTimeout(()=>el.classList.remove("on"), 1600);
+}
+
+/* ---------- 启动 ---------- */
+document.getElementById("footL").textContent =
+  "数据更新 " + (META.updated_at ? META.updated_at.replace("T"," ").slice(0,16) : "尚未采集");
+document.getElementById("footR").textContent = META.watch_count
+  ? "范围：" + (META.scope || "自定") + " · 关注 " + META.watch_count + " 个来源"
+  : "尚未设置关注清单";
+document.getElementById("sidefoot").innerHTML =
+  "更新于<br>" + (META.updated_at ? META.updated_at.replace("T"," ").slice(0,16) : "—") +
+  "<br><br>来源 " + (META.watch_count||0) + " 个<br>共 " + DATA.length + " 条记录";
+
+renderStats();
+renderNav();
+render();
+</script>
+
+
+</body></html>
