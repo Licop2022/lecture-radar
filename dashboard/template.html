@@ -144,6 +144,11 @@
   .badge.past{background:#f0f0ec;color:var(--ink-3)}
   .badge.new{background:#fff4e5;color:#c2410c}
   .badge.credit{background:var(--credit-soft);color:var(--credit)}
+  .badge.campus{background:#eef5f3;color:#1f5c53}
+  .badge.muted{background:#f0f0ec;color:var(--ink-3);font-weight:500}
+  .badge.aud{background:#f2f2fd;color:#4338ca;font-weight:500}
+  .badge.col0{background:#eef5f3;color:#1f5c53;font-weight:600}
+  .badge.col1{background:#eef4fc;color:#1d4ed8;font-weight:600}
   .meta{display:flex;flex-direction:column;gap:2px;margin-bottom:7px}
   .meta div{font-size:12.5px;color:var(--ink-2);display:flex;gap:7px;align-items:baseline}
   .meta .k{color:var(--ink-3);flex:0 0 auto;min-width:32px}
@@ -244,7 +249,7 @@
 <div class="app">
 
   <aside class="side">
-    <div class="brand"><b>讲座雷达</b><span>广工 · 全校</span></div>
+    <div class="brand"><b>讲座雷达</b><span>广工 · 校内优先</span></div>
     <nav id="nav"></nav>
     <div class="sidefoot" id="sidefoot"></div>
   </aside>
@@ -310,7 +315,27 @@ function navDefs(){
   const order = ["学术报告","学术会议","论坛会议","宣讲招聘","学科竞赛","其他"];
   const catItems = order.filter(c=>cats[c]).map(c=>({key:"cat:"+c, label:c}));
   Object.keys(cats).forEach(c=>{ if(!order.includes(c)) catItems.push({key:"cat:"+c, label:c}); });
-  return [
+
+  // 范围：校内 / 校外 / 地点待确认
+  const scopeItems = [];
+  if(DATA.some(r=>r.on_campus===true)) scopeItems.push({key:"scope:on", label:"校内讲座"});
+  if(DATA.some(r=>r.on_campus===false)) scopeItems.push({key:"scope:off", label:"校外 / 外埠"});
+  if(DATA.some(r=>r.on_campus==null)) scopeItems.push({key:"scope:unknown", label:"地点待确认"});
+
+  // 面向学院：自动化 / 信工 两个独立入口（即使暂无数据也保留，便于持续投喂）
+  const cgroups = (META.college_groups && META.college_groups.length)
+    ? META.college_groups : ["自动化学院","信息工程学院"];
+  const colItems = cgroups.map(c=>({key:"college:"+c, label:"面向"+c}));
+  if(DATA.some(r=>!r.college)) colItems.push({key:"college:__other", label:"其他院系 / 全校"});
+
+  // 受众：只列出数据里真实出现过的标签
+  const auds = {};
+  DATA.forEach(r=>String(r.audience||"").split("、").filter(Boolean).forEach(a=>{auds[a]=(auds[a]||0)+1;}));
+  const audOrder = ["全校学生","研究生","本科生","教师"];
+  const audItems = audOrder.filter(a=>auds[a]).map(a=>({key:"aud:"+a, label:a}));
+  Object.keys(auds).forEach(a=>{ if(!audOrder.includes(a)) audItems.push({key:"aud:"+a, label:a}); });
+
+  const groups = [
     { title:"时间", items:[
       {key:"all", label:"全部讲座"},
       {key:"today", label:"今天"},
@@ -320,13 +345,17 @@ function navDefs(){
     ]},
     { title:"学分条", items:[
       {key:"credit", label:"有学术条 / 实践条"}
-    ]},
-    { title:"类型", items: catItems },
-    { title:"来源", items:[
-      {key:"src:wechat", label:"公众号"},
-      {key:"src:web", label:"学校官网"}
     ]}
   ];
+  if(colItems.length) groups.push({ title:"面向学院", items: colItems });
+  if(scopeItems.length) groups.push({ title:"参与范围", items: scopeItems });
+  if(audItems.length) groups.push({ title:"受众身份", items: audItems });
+  groups.push({ title:"类型", items: catItems });
+  groups.push({ title:"来源", items:[
+    {key:"src:wechat", label:"公众号"},
+    {key:"src:web", label:"学校官网"}
+  ]});
+  return groups;
 }
 
 /* ---------- 过滤 ---------- */
@@ -345,6 +374,12 @@ function navMatch(r){
   if(k === "week") return n !== null && n >= 0 && n <= 7;
   if(k === "past") return n !== null && n < 0;
   if(k === "credit") return !!r.credit;
+  if(k === "scope:on") return r.on_campus === true;
+  if(k === "scope:off") return r.on_campus === false;
+  if(k === "scope:unknown") return r.on_campus == null;
+  if(k.startsWith("aud:")) return String(r.audience||"").includes(k.slice(4));
+  if(k === "college:__other") return !r.college;
+  if(k.startsWith("college:")) return r.college === k.slice(8);
   if(k.startsWith("cat:")) return (r.category || "其他") === k.slice(4);
   if(k === "src:wechat") return r.src_type === "wechat";
   if(k === "src:web") return r.src_type === "web";
@@ -385,6 +420,11 @@ function cardHTML(r){
 
   const cat = r.category || "其他";
   const catHTML = `<span class="cat ${CAT_CLASS[cat]||""}">${esc(cat)}</span>`;
+  const chips = [];
+  if(r.college) chips.push(`<span class="badge ${r.college==="自动化学院"?"col0":"col1"}">${esc(r.college)}</span>`);
+  if(r.on_campus === true) chips.push(`<span class="badge campus">${esc(r.campus && r.campus!=="校内" ? r.campus : "校内")}</span>`);
+  if(r.on_campus === false) chips.push('<span class="badge muted">校外</span>');
+  if(r.audience) chips.push(`<span class="badge aud">${esc(r.audience)}</span>`);
   const tags = (r.tags||[]).slice(0,2).map(t=>`<span class="tag">${esc(t)}</span>`).join("");
   const titleHTML = r.url
     ? `<a class="title" href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title)}</a>`
@@ -399,7 +439,7 @@ function cardHTML(r){
       <div class="titlerow">${titleHTML}${badges.join("")}</div>
       ${meta.length?`<div class="meta">${meta.join("")}</div>`:""}
       ${r.summary?`<p class="summary">${esc(r.summary)}</p>`:""}
-      <div class="foot">${catHTML}${tags}<span class="src">${esc(r.source||"")} ${srcLink}</span></div>
+      <div class="foot">${catHTML}${chips.join("")}${tags}<span class="src">${esc(r.source||"")} ${srcLink}</span></div>
     </div>
   </article>`;
 }
@@ -437,9 +477,15 @@ function renderNav(){
 function navLabel(){
   const k = state.nav;
   if(k.startsWith("cat:")) return "类型 · " + k.slice(4);
+  if(k.startsWith("aud:")) return "受众 · " + k.slice(4);
+  if(k === "college:__other") return "面向学院 · 其他院系 / 全校";
+  if(k.startsWith("college:")) return "面向 · " + k.slice(8);
   if(k === "src:wechat") return "来源 · 公众号";
   if(k === "src:web") return "来源 · 学校官网";
   if(k === "credit") return "带学术条 / 实践条";
+  if(k === "scope:on") return "参与范围 · 校内讲座";
+  if(k === "scope:off") return "参与范围 · 校外 / 外埠";
+  if(k === "scope:unknown") return "参与范围 · 地点待确认";
   return {all:"全部讲座", today:"今天", tomorrow:"明天", week:"未来 7 天", past:"已结束"}[k] || "全部讲座";
 }
 
@@ -491,8 +537,9 @@ function renderStats(){
   const week = DATA.filter(r=>{const n=daysFromToday(r.date);return n!==null&&n>=0&&n<=7;}).length;
   const credit = DATA.filter(r=>!!r.credit).length;
   const fresh = DATA.filter(r=>r.is_new).length;
+  const oncampus = DATA.filter(r=>r.on_campus===true).length;
   document.getElementById("stats").innerHTML = `
-    <div class="stat"><div class="n">${DATA.length}</div><div class="k">累计收录</div></div>
+    <div class="stat"><div class="n">${oncampus}</div><div class="k">校内讲座</div></div>
     <div class="stat"><div class="n ${today?'hot':''}">${today}</div><div class="k">今天开讲</div></div>
     <div class="stat"><div class="n">${week}</div><div class="k">未来 7 天</div></div>
     <div class="stat"><div class="n ${credit?'cr':''}">${credit}</div><div class="k">带学分条</div></div>
@@ -542,12 +589,16 @@ function toast(msg){
 /* ---------- 启动 ---------- */
 document.getElementById("footL").textContent =
   "数据更新 " + (META.updated_at ? META.updated_at.replace("T"," ").slice(0,16) : "尚未采集");
-document.getElementById("footR").textContent = META.watch_count
+document.getElementById("footR").textContent = (META.watch_count
   ? "范围：" + (META.scope || "自定") + " · 关注 " + META.watch_count + " 个来源"
-  : "尚未设置关注清单";
+  : "尚未设置关注清单")
+  + (META.focus_audience && META.focus_audience.length ? " · 重点受众：" + META.focus_audience.join(" / ") : "");
 document.getElementById("sidefoot").innerHTML =
   "更新于<br>" + (META.updated_at ? META.updated_at.replace("T"," ").slice(0,16) : "—") +
-  "<br><br>来源 " + (META.watch_count||0) + " 个<br>共 " + DATA.length + " 条记录";
+  "<br><br>来源 " + (META.watch_count||0) + " 个 · 共 " + DATA.length + " 条" +
+  (META.focus_audience && META.focus_audience.length
+    ? "<br>重点受众<br>" + META.focus_audience.map(a=>"· "+esc(a)).join("<br>")
+    : "");
 
 renderStats();
 renderNav();

@@ -1,6 +1,6 @@
 {
-  "_说明": "范围：全校讲座。抓取以 site_anchors（官网栏目页）为主，search_priority 为关键词检索的重点来源，每轮检索条数受 max_queries_per_run 限制，避免跑飞。",
-  "scope": "全校",
+  "_说明": "范围：全校讲座，优先校内线下场。抓取以 site_anchors（官网栏目页）为主，search_priority 为关键词检索的重点来源，每轮检索条数受 max_queries_per_run 限制。",
+  "scope": "全校 · 校内优先",
   "watchlist": {
     "校级": [
       "广东工业大学",
@@ -27,7 +27,6 @@
       "广东工业大学管理学院",
       "广东工业大学经济学院",
       "广东工业大学数学与统计学院",
-      "广东工业大学物理与光电工程学院",
       "广东工业大学艺术与设计学院",
       "广东工业大学生物医药学院",
       "广东工业大学马克思主义学院",
@@ -47,8 +46,39 @@
     "https://www.gdut.edu.cn/index/tzgg.htm",
     "https://tsjy.gdut.edu.cn/",
     "https://automation.gdut.edu.cn/tzgg.htm",
-    "https://automation.gdut.edu.cn/xygk/xwdt.htm"
+    "https://automation.gdut.edu.cn/xygk/xwdt.htm",
+    "https://xxgcxy.gdut.edu.cn/kxyj/xsbg.htm",
+    "https://xxgcxy.gdut.edu.cn/"
   ],
+  "focus_audience": [
+    "全校学生",
+    "自动化学院学生",
+    "信息工程学院学生"
+  ],
+  "campus_scope": {
+    "_说明": "优先收录参与地点在校内（广工各校区）的讲座；校外会议仅在明确面向我校研究生时收录。",
+    "prefer_on_campus": true,
+    "campuses": [
+      "大学城校区",
+      "东风路校区",
+      "龙洞校区",
+      "番禺校区",
+      "揭阳校区",
+      "沙河校区"
+    ],
+    "on_campus_markers": [
+      "大讲堂",
+      "工学一号馆",
+      "工学二号馆",
+      "工学四号馆",
+      "实验四号楼",
+      "理学馆",
+      "文化活动中心",
+      "青春报告厅",
+      "学术报告厅",
+      "图书馆"
+    ]
+  },
   "keywords": [
     "讲座",
     "讲座预告",
@@ -65,13 +95,45 @@
     "days_back": 45,
     "max_queries_per_run": 6,
     "max_results_per_query": 8,
-    "allowed_domains": ["mp.weixin.qq.com", "*.gdut.edu.cn", "gdut.cn", "*.gdut.cn"],
+    "allowed_domains": [
+      "mp.weixin.qq.com",
+      "*.gdut.edu.cn",
+      "gdut.cn",
+      "*.gdut.cn"
+    ],
     "prefer_wechat": true,
     "track_credit": true
   },
   "settings": {
     "retention_days": 60,
-    "push_hours": [8, 20],
-    "timezone": "Asia/Shanghai"
+    "timezone": "Asia/Shanghai",
+    "push_times": [
+      "12:30",
+      "20:30"
+    ]
+  },
+  "college_scope": {
+    "_说明": "导航按「面向学院」分开：自动化学院 / 信息工程学院 / 其他院系。判定只依据标题、主办、摘要、来源域名中出现的显式线索，无线索则归入其他院系，不做猜测。",
+    "groups": [
+      "自动化学院",
+      "信息工程学院"
+    ],
+    "markers": {
+      "自动化学院": [
+        "自动化学院",
+        "自动化学工",
+        "汇智自动化",
+        "自动化专业",
+        "控制科学"
+      ],
+      "信息工程学院": [
+        "信息工程学院",
+        "信工学院",
+        "信研博学",
+        "信息工程专业",
+        "通信工程",
+        "xxgcxy"
+      ]
+    }
   }
 }

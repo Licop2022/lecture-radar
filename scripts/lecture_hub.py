@@ -75,7 +75,31 @@ def load_config():
     return {}
 
 
-FIELDS = ["title", "speaker", "date", "time_text", "location", "org", "source", "url", "summary", "category"]
+FIELDS = ["title", "speaker", "date", "time_text", "location", "org", "source", "url", "summary", "category", "audience", "college", "campus"]
+
+# 面向学院判定：只认显式线索（学院名/品牌栏目/来源域名），命中位置最靠前者优先
+COLLEGE_MARKERS = {
+    "自动化学院": ["自动化学院", "自动化学工", "汇智自动化", "自动化专业", "控制科学"],
+    "信息工程学院": ["信息工程学院", "信工学院", "信研博学", "信息工程专业", "通信工程"],
+}
+COLLEGE_HOSTS = {
+    "xxgcxy.gdut.edu.cn": "信息工程学院",
+    "automation.gdut.edu.cn": "自动化学院",
+}
+
+# 校内地点判定：校区名 → 具体建筑 → 校外场所
+CAMPUS_NAMES = ["大学城校区", "东风路校区", "龙洞校区", "番禺校区", "揭阳校区", "沙河校区"]
+ON_CAMPUS_MARKERS = ["大讲堂", "工学一号馆", "工学二号馆", "工学四号馆", "实验四号楼", "理学馆",
+                     "文化活动中心", "青春报告厅", "学术报告厅", "图书馆", "教八", "教三", "教五"]
+OFF_CAMPUS_MARKERS = ["国际会议中心", "会议中心", "酒店", "会展中心", "北京", "上海", "深圳", "珠海", "佛山"]
+
+# 受众推断：仅在原文/摘要显式出现时才标注，不臆测
+AUDIENCE_RULES = [
+    ("全校学生", ["全校学生", "全体学生", "全校师生", "全体师生", "全校研究生"]),
+    ("研究生", ["研究生", "博士生", "硕士生", "硕博"]),
+    ("本科生", ["本科生", "本科同学"]),
+    ("教师", ["青年教师", "教职工", "专任教师"]),
+]
 
 # 类型推断：按关键词优先级匹配，title 命中即归类
 CATEGORY_RULES = [
@@ -96,6 +120,51 @@ def infer_category(title):
     return "其他"
 
 
+def classify_location(loc):
+    """返回 (campus, on_campus)。on_campus 为 True/False/None（无法判断）"""
+    s = loc or ""
+    if not s.strip():
+        return "", None
+    for c in CAMPUS_NAMES:
+        if c in s:
+            return c, True
+    for k in ON_CAMPUS_MARKERS:
+        if k in s:
+            return "校内", True
+    for k in OFF_CAMPUS_MARKERS:
+        if k in s:
+            return "校外", False
+    return "", None
+
+
+def infer_audience(text):
+    """从标题/摘要/主办中提取受众标签，多个用顿号连接；无明确线索返回空串"""
+    t = text or ""
+    hits = []
+    for label, keys in AUDIENCE_RULES:
+        if any(k in t for k in keys):
+            hits.append(label)
+    return "、".join(hits)
+
+
+def infer_college(title="", org="", summary="", url=""):
+    """判断讲座面向哪个学院：自动化学院 / 信息工程学院 / 空串（其他院系或未标注）"""
+    blob = " ".join([title or "", org or "", summary or ""])
+    best, pos = "", None
+    for name, keys in COLLEGE_MARKERS.items():
+        for k in keys:
+            i = blob.find(k)
+            if i >= 0 and (pos is None or i < pos):
+                best, pos = name, i
+    if best:
+        return best
+    host = re.sub(r"^https?://", "", url or "").split("/")[0].lower()
+    for h, name in COLLEGE_HOSTS.items():
+        if host.endswith(h):
+            return name
+    return ""
+
+
 def normalize_record(raw):
     rec = {}
     for k in FIELDS:
@@ -113,6 +182,16 @@ def normalize_record(raw):
         rec["credit"] = (c or "").strip()
     if not rec.get("category"):
         rec["category"] = infer_category(rec["title"])
+    # 校内/校外判定：写回 campus（校区名或「校内」「校外」）与 on_campus（True/False/None）
+    campus, on_campus = classify_location(rec["location"])
+    rec["campus"] = campus
+    rec["on_campus"] = on_campus
+    # 受众：原文未写明时按标题/摘要/主办显式线索推断
+    if not rec["audience"]:
+        rec["audience"] = infer_audience(" ".join([rec["title"], rec["summary"], rec["org"]]))
+    # 面向学院：导航里「自动化 / 信工」两个入口靠它分开
+    if not rec["college"]:
+        rec["college"] = infer_college(rec["title"], rec["org"], rec["summary"], rec["url"])
     # 日期兜底：从 time_text 里抠 YYYY-MM-DD 或 YYYY年M月D日
     if not rec["date"]:
         m = re.search(r"(\d{4})[-/年](\d{1,2})[-/月](\d{1,2})", rec["time_text"] or rec["title"])
@@ -166,6 +245,11 @@ def cmd_add(args):
                 if new_credit not in existing:
                     old["credit"] = (old_credit + "、" + new_credit) if old_credit else new_credit
                     changed = True
+            # campus / on_campus 始终随 location 重算，避免历史记录残留旧判定
+            ncampus, non = classify_location(old.get("location"))
+            if old.get("campus") != ncampus or old.get("on_campus") != non:
+                old["campus"], old["on_campus"] = ncampus, non
+                changed = True
             old["last_seen"] = stamp
             updated += 1 if changed else 0
             skipped += 0 if changed else 1
@@ -224,6 +308,17 @@ def cmd_render(args):
         rec = dict(r)
         if not rec.get("category"):
             rec["category"] = infer_category(rec.get("title", ""))
+        # 兼容历史记录：现场重算校内归属与受众
+        if not rec.get("campus") or "on_campus" not in rec:
+            rcampus, ron = classify_location(rec.get("location"))
+            rec["campus"] = rec.get("campus") or rcampus
+            rec["on_campus"] = ron
+        if not rec.get("audience"):
+            rec["audience"] = infer_audience(" ".join([
+                rec.get("title", ""), rec.get("summary", ""), rec.get("org", "")]))
+        if not rec.get("college"):
+            rec["college"] = infer_college(rec.get("title", ""), rec.get("org", ""),
+                                           rec.get("summary", ""), rec.get("url", ""))
         rec["src_type"] = "wechat" if "mp.weixin.qq.com" in (rec.get("url") or "") else "web"
         d = r.get("date") or ""
         try:
@@ -261,6 +356,9 @@ def cmd_render(args):
         "scope": cfg.get("scope", ""),
         "watch_count": len(wl),
         "watchlist": wl[:8],
+        "focus_audience": cfg.get("focus_audience", []),
+        "college_groups": (cfg.get("college_scope") or {}).get("groups", []),
+        "campuses": (cfg.get("campus_scope") or {}).get("campuses", []),
     }
     html = tpl.replace("__LECTURES_JSON__", json.dumps(lectures, ensure_ascii=False))
     html = html.replace("__META_JSON__", json.dumps(meta, ensure_ascii=False))
