@@ -75,7 +75,25 @@ def load_config():
     return {}
 
 
-FIELDS = ["title", "speaker", "date", "time_text", "location", "org", "source", "url", "summary"]
+FIELDS = ["title", "speaker", "date", "time_text", "location", "org", "source", "url", "summary", "category"]
+
+# 类型推断：按关键词优先级匹配，title 命中即归类
+CATEGORY_RULES = [
+    ("宣讲招聘", ["宣讲", "招聘", "双选", "供需见面"]),
+    ("学科竞赛", ["竞赛", "大赛", "挑战杯", "数学建模"]),
+    ("论坛会议", ["论坛", "研讨会", "峰会", "圆桌", "沙龙", "工作坊"]),
+    ("学术会议", ["大会", "年会", "学术会议", "会议通知"]),
+    ("学术报告", ["大讲堂", "学术报告", "报告会", "讲座", "讲坛", "学术报告会"]),
+]
+
+
+def infer_category(title):
+    t = title or ""
+    for name, keys in CATEGORY_RULES:
+        for k in keys:
+            if k in t:
+                return name
+    return "其他"
 
 
 def normalize_record(raw):
@@ -87,12 +105,14 @@ def normalize_record(raw):
     if isinstance(tags, str):
         tags = [t.strip() for t in re.split(r"[,，;；/]", tags) if t.strip()]
     rec["tags"] = tags
-    # credit：可获得的「条」/学分，如 学术条、事件条、实践时长；空串表示无
+    # credit：可获得的「条」/学分，如 学术条、实践条、实践时长；空串表示无
     c = raw.get("credit")
     if isinstance(c, bool):
         rec["credit"] = "学术条" if c else ""
     else:
         rec["credit"] = (c or "").strip()
+    if not rec.get("category"):
+        rec["category"] = infer_category(rec["title"])
     # 日期兜底：从 time_text 里抠 YYYY-MM-DD 或 YYYY年M月D日
     if not rec["date"]:
         m = re.search(r"(\d{4})[-/年](\d{1,2})[-/月](\d{1,2})", rec["time_text"] or rec["title"])
@@ -202,6 +222,9 @@ def cmd_render(args):
     lectures = []
     for r in db["lectures"]:
         rec = dict(r)
+        if not rec.get("category"):
+            rec["category"] = infer_category(rec.get("title", ""))
+        rec["src_type"] = "wechat" if "mp.weixin.qq.com" in (rec.get("url") or "") else "web"
         d = r.get("date") or ""
         try:
             dt = datetime.strptime(d[:10], "%Y-%m-%d").date()
