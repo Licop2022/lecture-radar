@@ -14,14 +14,22 @@
 - **纯本地运行**：数据是 `data/lectures.json`，看板是单个 `index.html`，不依赖任何服务端
 - **线上同步**：`scripts/publish.sh` 一条命令完成渲染→提交→推送，GitHub Actions 自动重新部署 Pages
 
+## 换电脑继续维护
+
+代码、配置、数据、部署流程都在仓库里，装好 Git + Python 3 后 `git clone` 即可接手。
+定时采集任务、Git 凭据、个人记忆是**本机文件**，不随仓库走，需要单独补。完整步骤见 **[SETUP.md](SETUP.md)**。
+
 ## 目录结构
 
 ```
 config.json                  关注名单、检索参数、来源白名单
 scripts/lecture_hub.py       采集中枢：add / render / prune / list
+scripts/publish.sh           一键发布：同步→清理→渲染→提交→推送（跨机通用）
 dashboard/template.html      看板模板（占位符替换）
 data/lectures.json           讲座主库
 index.html                   渲染产物，直接用浏览器打开
+automation/collect-prompt.md 定时采集任务的 prompt 备份，换机时照它重建
+SETUP.md                     换电脑 / 交接指南
 ```
 
 ## 用法
