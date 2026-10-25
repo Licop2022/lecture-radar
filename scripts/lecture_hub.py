@@ -352,7 +352,7 @@ def cmd_render(args):
         wl = [x for v in wl.values() if isinstance(v, list) for x in v]
     meta = {
         "updated_at": db.get("updated_at"),
-        "rendered_at": iso(now()),
+        # 不写 render 时间戳：看板内容应只随数据变化，否则每次渲染都会产生无意义提交
         "scope": cfg.get("scope", ""),
         "watch_count": len(wl),
         "watchlist": wl[:8],
