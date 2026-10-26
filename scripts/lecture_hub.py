@@ -248,6 +248,52 @@ def infer_host_college(title="", org="", source="", url=""):
     return ""
 
 
+_CFG_CACHE = None
+
+
+def _cfg():
+    global _CFG_CACHE
+    if _CFG_CACHE is None:
+        _CFG_CACHE = load_config()
+    return _CFG_CACHE
+
+
+def infer_other_college(org="", source="", title=""):
+    """识别「其他学院」：主办 / 来源 / 标题里出现、但不属于目标学院的学院名。
+
+    如轻工化工学院主办的「轻化名师讲坛」——对自动化 / 信工的学生基本无用。
+    """
+    cfg = _cfg()
+    groups = (cfg.get("college_scope") or {}).get("groups") or ["自动化学院", "信息工程学院"]
+    blob = " ".join([org or "", source or "", title or ""])
+    hits = []
+    for full in cfg.get("watchlist", {}).get("学院", []):
+        short = full.replace("广东工业大学", "").strip()
+        if not short.endswith("学院") or short in groups:
+            continue
+        if short in blob and short not in hits:
+            hits.append(short)
+    return "、".join(hits)
+
+
+def quality_ok(rec):
+    """是否收入看板（2026-10-26 用户口径，宁缺勿滥）。
+
+    - 其他学院主办的：不收（自动化 / 信工之外）
+    - 讲座活动：必须有学术条 / 实践条，**或**原文明确写了面向群体；两者皆无的不收
+    - 学生事务：只要不是其他学院的，一律保留（事务本身不需要学分条）
+    """
+    if rec.get("other_college"):
+        return False
+    if rec.get("kind") == "notice":
+        return True
+    if rec.get("credit"):
+        return True
+    if rec.get("audience") and not rec.get("audience_inferred"):
+        return True
+    return False
+
+
 def normalize_record(raw):
     rec = {}
     for k in FIELDS:
@@ -278,9 +324,15 @@ def normalize_record(raw):
     campus, on_campus = classify_location(rec["location"])
     rec["campus"] = campus
     rec["on_campus"] = on_campus
-    # 受众：原文未写明时按标题/摘要/主办显式线索推断
+    # 其他学院（自动化 / 信工之外）主办：默认不收
+    rec["other_college"] = infer_other_college(rec["org"], rec["source"], rec["title"])
+    # 受众：原文未写明时按标题/摘要/主办显式线索推断；推断出来的不算「明确面向」，
+    # 不能用来通过收录门槛（见 quality_ok）
     if not rec["audience"]:
         rec["audience"] = infer_audience(" ".join([rec["title"], rec["summary"], rec["org"]]))
+        rec["audience_inferred"] = 1
+    else:
+        rec["audience_inferred"] = 0
     # 面向学院：只认明确「面向 X 学院」的表述，免得把主办方当成受众
     if not rec["college"]:
         rec["college"] = infer_college(rec["title"], rec["summary"])
@@ -444,6 +496,7 @@ def cmd_render(args):
     cfg = load_config()
     today = now().date()
     lectures = []
+    excluded = []
     for r in db["lectures"]:
         rec = dict(r)
         # 兼容历史记录：缺字段时现场推断（kind 先定，类别规则依赖它）
@@ -458,11 +511,17 @@ def cmd_render(args):
         if not rec.get("audience"):
             rec["audience"] = infer_audience(" ".join([
                 rec.get("title", ""), rec.get("summary", ""), rec.get("org", "")]))
+            rec["audience_inferred"] = 1
+        else:
+            rec.setdefault("audience_inferred", 0)
         if not rec.get("college"):
             rec["college"] = infer_college(rec.get("title", ""), rec.get("summary", ""))
         if not rec.get("host_college"):
             rec["host_college"] = infer_host_college(rec.get("title", ""), rec.get("org", ""),
                                                      rec.get("source", ""), rec.get("url", ""))
+        if "other_college" not in rec:
+            rec["other_college"] = infer_other_college(
+                rec.get("org", ""), rec.get("source", ""), rec.get("title", ""))
         rec["src_type"] = "wechat" if "mp.weixin.qq.com" in (rec.get("url") or "") else "web"
         d = r.get("date") or ""
         if rec["kind"] == "notice":
@@ -478,6 +537,11 @@ def cmd_render(args):
                 rec["is_new"] = (now() - datetime.strptime(fs[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=TZ)) < timedelta(hours=24)
             except ValueError:
                 pass
+        # 收录门槛：其他学院 / 无条且受众不明的不进看板（数据仍留在库里，改口径重新 render 即可恢复）
+        if not quality_ok(rec):
+            excluded.append({"title": rec.get("title", ""),
+                             "reason": "其他学院" if rec.get("other_college") else "无学分条且受众不明"})
+            continue
         lectures.append(rec)
 
     with open(TEMPLATE_PATH, "r", encoding="utf-8") as f:
@@ -499,6 +563,8 @@ def cmd_render(args):
         "kind_labels": KIND_LABELS,
         "activity_categories": ACTIVITY_CATEGORIES,
         "notice_categories": NOTICE_CATEGORIES,
+        # 未达收录门槛而被隐藏的条数（数据仍在库里）
+        "filtered_count": len(excluded),
     }
     html = tpl.replace("__LECTURES_JSON__", json.dumps(lectures, ensure_ascii=False))
     html = html.replace("__META_JSON__", json.dumps(meta, ensure_ascii=False))

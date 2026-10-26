@@ -675,6 +675,7 @@ document.getElementById("footR").textContent = (META.watch_count
 document.getElementById("sidefoot").innerHTML =
   "更新于<br>" + (META.updated_at ? META.updated_at.replace("T"," ").slice(0,16) : "—") +
   "<br><br>来源 " + (META.watch_count||0) + " 个 · 共 " + DATA.length + " 条" +
+  (META.filtered_count ? "<br><span style=\"color:var(--ink-3)\">另有 " + META.filtered_count + " 条未达收录门槛已隐藏</span>" : "") +
   (META.focus_audience && META.focus_audience.length
     ? "<br>重点受众<br>" + META.focus_audience.map(a=>"· "+esc(a)).join("<br>")
     : "");
