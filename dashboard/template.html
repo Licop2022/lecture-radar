@@ -308,6 +308,22 @@ function esc(s){
 }
 const CAT_CLASS = {"学术报告":"c0","论坛会议":"c1","学术会议":"c2","宣讲招聘":"c3","学科竞赛":"c4","其他":""};
 
+/* 面向学院列表：与「面向学院」导航共用同一份口径 */
+const COLLEGE_GROUPS = (META.college_groups && META.college_groups.length)
+  ? META.college_groups : ["自动化学院","信息工程学院"];
+const GRAD_LABELS = COLLEGE_GROUPS.map(c => c + "研究生");
+
+/* 研究生受众按学院拆分：
+   口径 —— 记录面向研究生（audience 含「研究生」），且
+     · college 指向某学院  → 只算该学院
+     · college 为空（面向全校 / 未限定 / 其他院系）→ 每个学院都算
+   用户约定：面向全部研究生的讲座，也要能在这两个学院入口里被筛出来。 */
+function gradAuds(r){
+  if(!String(r.audience||"").includes("研究生")) return [];
+  return COLLEGE_GROUPS.filter(c => !r.college || r.college === c).map(c => c + "研究生");
+}
+
+
 /* ---------- nav ---------- */
 function navDefs(){
   const cats = {};
@@ -323,16 +339,19 @@ function navDefs(){
   if(DATA.some(r=>r.on_campus==null)) scopeItems.push({key:"scope:unknown", label:"地点待确认"});
 
   // 面向学院：自动化 / 信工 两个独立入口（即使暂无数据也保留，便于持续投喂）
-  const cgroups = (META.college_groups && META.college_groups.length)
-    ? META.college_groups : ["自动化学院","信息工程学院"];
-  const colItems = cgroups.map(c=>({key:"college:"+c, label:"面向"+c}));
+  const colItems = COLLEGE_GROUPS.map(c=>({key:"college:"+c, label:"面向"+c}));
   if(DATA.some(r=>!r.college)) colItems.push({key:"college:__other", label:"其他院系 / 全校"});
 
-  // 受众：只列出数据里真实出现过的标签
+  // 受众：字面标签 + 研究生按学院派生的两个入口
   const auds = {};
-  DATA.forEach(r=>String(r.audience||"").split("、").filter(Boolean).forEach(a=>{auds[a]=(auds[a]||0)+1;}));
-  const audOrder = ["全校学生","研究生","本科生","教师"];
+  DATA.forEach(r=>{
+    String(r.audience||"").split("、").filter(Boolean).forEach(a=>{auds[a]=(auds[a]||0)+1;});
+    gradAuds(r).forEach(a=>{auds[a]=(auds[a]||0)+1;});
+  });
+  const audOrder = ["全校学生","研究生",...GRAD_LABELS,"本科生","教师"];
   const audItems = audOrder.filter(a=>auds[a]).map(a=>({key:"aud:"+a, label:a}));
+  // 两个学院研究生入口常驻，0 条也不隐藏（与「面向学院」一致，便于持续投喂）
+  GRAD_LABELS.forEach(g=>{ if(!auds[g]) audItems.push({key:"aud:"+g, label:g}); });
   Object.keys(auds).forEach(a=>{ if(!audOrder.includes(a)) audItems.push({key:"aud:"+a, label:a}); });
 
   const groups = [
@@ -377,7 +396,11 @@ function navMatch(r){
   if(k === "scope:on") return r.on_campus === true;
   if(k === "scope:off") return r.on_campus === false;
   if(k === "scope:unknown") return r.on_campus == null;
-  if(k.startsWith("aud:")) return String(r.audience||"").includes(k.slice(4));
+  if(k.startsWith("aud:")){
+    const t = k.slice(4);
+    if(String(r.audience||"").includes(t)) return true;
+    return gradAuds(r).includes(t);
+  }
   if(k === "college:__other") return !r.college;
   if(k.startsWith("college:")) return r.college === k.slice(8);
   if(k.startsWith("cat:")) return (r.category || "其他") === k.slice(4);

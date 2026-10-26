@@ -42,6 +42,7 @@
 - 禁止臆造讲座、主讲人、日期、学分信息。日期不确定就留空，time_text 照抄原文。
 - 用 python scripts/lecture_hub.py add data/patch-YYYYMMDD-HH.json 录入，字段：title, speaker, date, time_text, location, org, source, url, summary, credit, audience, college, tags。
 - college 只在能确认时填「自动化学院」或「信息工程学院」，其他院系或不确定就留空。
+- 面向全部研究生（或全校师生）的讲座：audience 填「研究生」，**college 留空** —— 看板会自动把它同时计入「自动化学院研究生」「信息工程学院研究生」两个入口。只有明确只面向某一个学院时才填 college，填了反而会把它从另一个学院入口里排除掉。
 - 无新增就如实说「本轮无新增」，不要拿非讲座类通知凑数。
 
 【发布】
