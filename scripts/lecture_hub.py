@@ -63,7 +63,8 @@ def load_db():
 
 def save_db(db):
     os.makedirs(os.path.dirname(DATA_PATH), exist_ok=True)
-    db["lectures"].sort(key=lambda r: (r.get("date") or "9999-99-99", r.get("time_text") or ""))
+    db["lectures"].sort(key=lambda r: (r.get("date") or r.get("deadline") or "9999-99-99",
+                                      r.get("time_text") or ""))
     # newline="\n"：Windows 上默认会把 \n 转成 \r\n，导致每次写库都在 git 里产生全文 diff
     with open(DATA_PATH, "w", encoding="utf-8", newline="\n") as f:
         json.dump(db, f, ensure_ascii=False, indent=2)
@@ -76,7 +77,8 @@ def load_config():
     return {}
 
 
-FIELDS = ["title", "speaker", "date", "time_text", "location", "org", "source", "url", "summary", "category", "audience", "college", "host_college", "campus"]
+FIELDS = ["title", "speaker", "date", "time_text", "location", "org", "source", "url", "summary",
+          "category", "kind", "deadline", "audience", "college", "host_college", "campus"]
 
 # 面向学院（college）：只在原文有明确「面向」表述时才认。
 # 主办方是谁 ≠ 只面向谁 —— 信工主办的论坛常常面向全校研究生报名。
@@ -109,8 +111,13 @@ AUDIENCE_RULES = [
     ("教师", ["青年教师", "教职工", "专任教师"]),
 ]
 
-# 类型推断：按关键词优先级匹配，title 命中即归类
-CATEGORY_RULES = [
+# 内容类型：讲座活动（主线）/ 学生事务（补充）
+KINDS = ("activity", "notice")
+KIND_LABELS = {"activity": "讲座与活动", "notice": "学生事务"}
+
+# 活动类别（主线）：按关键词优先级匹配，title 命中即归类
+ACTIVITY_CATEGORIES = ["学术报告", "学术会议", "论坛会议", "宣讲招聘", "学科竞赛", "其他"]
+ACTIVITY_CATEGORY_RULES = [
     ("宣讲招聘", ["宣讲", "招聘", "双选", "供需见面"]),
     ("学科竞赛", ["竞赛", "大赛", "挑战杯", "数学建模"]),
     ("论坛会议", ["论坛", "研讨会", "峰会", "圆桌", "沙龙", "工作坊"]),
@@ -118,14 +125,63 @@ CATEGORY_RULES = [
     ("学术报告", ["大讲堂", "学术报告", "报告会", "讲座", "讲坛", "学术报告会"]),
 ]
 
+# 学生事务类别（补充）：只收与学生切身相关、有时效或需办理的事项
+NOTICE_CATEGORIES = ["奖助学金", "教务学籍", "假期校历", "就业实习", "竞赛报名", "生活服务", "其他通知"]
+NOTICE_CATEGORY_RULES = [
+    ("奖助学金", ["奖学金", "助学金", "助学贷款", "国家奖", "励志奖", "困难认定", "资助",
+                  "绿色通道", "补助", "减免", "评优", "评选", "评定"]),
+    ("教务学籍", ["选课", "缓考", "重修", "补考", "学籍", "成绩", "毕业审核", "开题",
+                  "中期检查", "答辩", "查重", "培养方案", "学分认定"]),
+    ("假期校历", ["放假", "假期", "校历", "调课", "停课", "开学", "报到", "返校",
+                  "寒假", "暑假", "节假日"]),
+    ("就业实习", ["招聘会", "实习", "三方协议", "就业", "派遣", "档案", "求职", "简历"]),
+    ("竞赛报名", ["竞赛", "大赛", "挑战杯", "互联网+", "数学建模", "报名", "参赛"]),
+    # 只收要办事 / 有节点的事项（医保缴费、宿舍调整、校园卡办理），不收防诈骗、消防演练这类宣传提醒
+    ("生活服务", ["医保", "宿舍", "校园卡", "体检", "心理", "食堂", "水电", "校医院", "报销"]),
+]
 
-def infer_category(title):
+# 内容类型判定：标题里出现明确的活动词 → 活动；出现明确的事务词 → 通知
+ACTIVITY_STRONG = ["讲座", "学术报告", "报告会", "论坛", "沙龙", "工作坊", "研讨会", "学术会议",
+                   "大讲堂", "讲坛", "年会", "宣讲会", "招聘会", "双选会", "平行会议"]
+NOTICE_STRONG = ["奖学金", "助学金", "资助", "助学贷款", "困难认定", "评优", "放假", "校历",
+                 "选课", "缓考", "重修", "补考", "学籍", "成绩", "报名", "截止", "答辩", "开题",
+                 "中期检查", "医保", "宿舍", "校园卡", "体检", "派遣", "档案", "实习", "缴费"]
+# 弱信号：标题像通知但没命中具体事务词时，归通知而不是塞进讲座主视图
+NOTICE_WEAK = ["通知", "提醒", "公告", "公示", "安排", "须知", "指南", "办法", "细则", "说明"]
+
+
+def infer_kind(rec):
+    """activity（讲座 / 活动，主线）或 notice（学生事务，补充）。
+
+    优先级：显式 kind > 显式 category > 标题关键词 > 默认 activity。
+    「讲座报名」「宣讲会」这类仍算活动 —— 活动词先判，避免被「报名」误判成通知。
+    """
+    k = (rec.get("kind") or "").strip()
+    if k in KINDS:
+        return k
+    cat = (rec.get("category") or "").strip()
+    if cat in NOTICE_CATEGORIES:
+        return "notice"
+    if cat in ACTIVITY_CATEGORIES:
+        return "activity"
+    title = rec.get("title", "") or ""
+    if any(w in title for w in ACTIVITY_STRONG):
+        return "activity"
+    if any(w in title for w in NOTICE_STRONG):
+        return "notice"
+    if any(w in title for w in NOTICE_WEAK):
+        return "notice"
+    return "activity"
+
+
+def infer_category(title, kind="activity"):
+    rules = NOTICE_CATEGORY_RULES if kind == "notice" else ACTIVITY_CATEGORY_RULES
     t = title or ""
-    for name, keys in CATEGORY_RULES:
+    for name, keys in rules:
         for k in keys:
             if k in t:
                 return name
-    return "其他"
+    return "其他通知" if kind == "notice" else "其他"
 
 
 def classify_location(loc):
@@ -207,8 +263,17 @@ def normalize_record(raw):
         rec["credit"] = "学术条" if c else ""
     else:
         rec["credit"] = (c or "").strip()
+    # 内容类型：先定是「讲座活动」还是「学生事务」，再按类型选类别规则
+    rec["kind"] = infer_kind(raw)
     if not rec.get("category"):
-        rec["category"] = infer_category(rec["title"])
+        rec["category"] = infer_category(rec["title"], rec["kind"])
+    # 截止日期（通知类用，如报名截止、提交截止）：统一成 YYYY-MM-DD
+    if rec.get("deadline"):
+        m = re.search(r"(\d{4})[-/年](\d{1,2})[-/月](\d{1,2})", rec["deadline"])
+        if m:
+            rec["deadline"] = "%04d-%02d-%02d" % (int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        else:
+            rec["deadline"] = ""
     # 校内/校外判定：写回 campus（校区名或「校内」「校外」）与 on_campus（True/False/None）
     campus, on_campus = classify_location(rec["location"])
     rec["campus"] = campus
@@ -307,7 +372,8 @@ def cmd_prune(args):
     db = load_db()
     keep, drop = [], 0
     for r in db["lectures"]:
-        d = r.get("date") or ""
+        # 通知类常常没有 date，用截止日期判断是否过期
+        d = r.get("date") or r.get("deadline") or ""
         try:
             dt = datetime.strptime(d[:10], "%Y-%m-%d").date()
         except ValueError:
@@ -326,7 +392,51 @@ def cmd_list(args):
     db = load_db()
     print("更新时间：%s  共 %d 条" % (db.get("updated_at") or "-", len(db["lectures"])))
     for r in db["lectures"]:
-        print("  [%s] %s | %s | %s" % (r.get("date") or "?", r.get("title", "")[:40], r.get("org") or r.get("source") or "-", r.get("id")))
+        flag = "通知" if r.get("kind") == "notice" else "活动"
+        extra = r.get("deadline") or r.get("date") or "?"
+        print("  [%s][%s] %s | %s | %s" % (extra, flag, r.get("title", "")[:40], r.get("org") or r.get("source") or "-", r.get("id")))
+
+
+def _delta(d, today):
+    try:
+        return (datetime.strptime((d or "")[:10], "%Y-%m-%d").date() - today).days
+    except ValueError:
+        return None
+
+
+def activity_status(date, today):
+    """讲座 / 活动：今天 / 明天 / N 天后 / 已结束"""
+    delta = _delta(date, today)
+    if delta is None:
+        return "unknown", "待确认"
+    if delta == 0:
+        return "today", "今天"
+    if delta == 1:
+        return "soon", "明天"
+    if delta > 1:
+        return "upcoming", "%d天后" % delta
+    return "past", "已结束"
+
+
+def notice_status(deadline, date, today):
+    """学生事务：优先按截止日期倒计时（≤3 天进入提醒态），没有截止日期才用关键日期"""
+    dd = _delta(deadline, today)
+    if dd is not None:
+        if dd < 0:
+            return "closed", "已截止"
+        if dd == 0:
+            return "due", "今天截止"
+        if dd <= 3:
+            return "due", "剩 %d 天截止" % dd
+        return "open", "%d 天后截止" % dd
+    nd = _delta(date, today)
+    if nd is not None:
+        if nd < 0:
+            return "closed", "已过"
+        if nd == 0:
+            return "today", "今天"
+        return "open", "%d 天后" % nd
+    return "unknown", "无明确日期"
 
 
 def cmd_render(args):
@@ -336,8 +446,10 @@ def cmd_render(args):
     lectures = []
     for r in db["lectures"]:
         rec = dict(r)
+        # 兼容历史记录：缺字段时现场推断（kind 先定，类别规则依赖它）
+        rec["kind"] = infer_kind(rec)
         if not rec.get("category"):
-            rec["category"] = infer_category(rec.get("title", ""))
+            rec["category"] = infer_category(rec.get("title", ""), rec["kind"])
         # 兼容历史记录：现场重算校内归属与受众
         if not rec.get("campus") or "on_campus" not in rec:
             rcampus, ron = classify_location(rec.get("location"))
@@ -353,19 +465,11 @@ def cmd_render(args):
                                                      rec.get("source", ""), rec.get("url", ""))
         rec["src_type"] = "wechat" if "mp.weixin.qq.com" in (rec.get("url") or "") else "web"
         d = r.get("date") or ""
-        try:
-            dt = datetime.strptime(d[:10], "%Y-%m-%d").date()
-            delta = (dt - today).days
-            if delta == 0:
-                rec["status"], rec["status_text"] = "today", "今天"
-            elif delta == 1:
-                rec["status"], rec["status_text"] = "soon", "明天"
-            elif delta > 1:
-                rec["status"], rec["status_text"] = "upcoming", "%d天后" % delta
-            else:
-                rec["status"], rec["status_text"] = "past", "已结束"
-        except ValueError:
-            rec["status"], rec["status_text"] = "unknown", "待确认"
+        if rec["kind"] == "notice":
+            rec["status"], rec["status_text"] = notice_status(
+                rec.get("deadline"), d, today)
+        else:
+            rec["status"], rec["status_text"] = activity_status(d, today)
         # 是否 24 小时内新收录
         fs = r.get("first_seen")
         rec["is_new"] = False
@@ -391,6 +495,10 @@ def cmd_render(args):
         "focus_audience": cfg.get("focus_audience", []),
         "college_groups": (cfg.get("college_scope") or {}).get("groups", []),
         "campuses": (cfg.get("campus_scope") or {}).get("campuses", []),
+        # 内容类型与类别清单：看板据此生成导航，避免前后端各写一份
+        "kind_labels": KIND_LABELS,
+        "activity_categories": ACTIVITY_CATEGORIES,
+        "notice_categories": NOTICE_CATEGORIES,
     }
     html = tpl.replace("__LECTURES_JSON__", json.dumps(lectures, ensure_ascii=False))
     html = html.replace("__META_JSON__", json.dumps(meta, ensure_ascii=False))

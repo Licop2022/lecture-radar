@@ -1,6 +1,6 @@
 {
   "_说明": "范围：全校讲座，优先校内线下场。抓取以 site_anchors（官网栏目页）为主，search_priority 为关键词检索的重点来源，每轮检索条数受 max_queries_per_run 限制。",
-  "scope": "全校 · 校内优先",
+  "scope": "全校 · 讲座与活动为主 · 学生事务补充",
   "watchlist": {
     "校级": [
       "广东工业大学",
@@ -48,8 +48,24 @@
     "https://automation.gdut.edu.cn/tzgg.htm",
     "https://automation.gdut.edu.cn/xygk/xwdt.htm",
     "https://xxgcxy.gdut.edu.cn/kxyj/xsbg.htm",
-    "https://xxgcxy.gdut.edu.cn/"
+    "https://xxgcxy.gdut.edu.cn/",
+    "https://yjs.gdut.edu.cn/",
+    "https://xsc.gdut.edu.cn/",
+    "https://jwc.gdut.edu.cn/"
   ],
+  "notice_scope": {
+    "_说明": "学生事务（补充内容）。讲座与活动仍是主线，每轮先保证 site_anchors 与 search_priority 的覆盖，再顺带收学生事务。只收与学生切身相关、有时效或需要办理的事项。",
+    "enabled": true,
+    "categories": ["奖助学金", "教务学籍", "假期校历", "就业实习", "竞赛报名", "生活服务"],
+    "include_keywords": ["奖学金", "助学金", "助学贷款", "困难认定", "评优", "评选", "补助",
+                         "选课", "缓考", "重修", "补考", "学籍", "成绩", "开题", "中期检查",
+                         "答辩", "查重", "放假", "校历", "调课", "报到", "返校",
+                         "实习", "三方协议", "派遣", "档案", "就业",
+                         "竞赛报名", "参赛", "医保", "宿舍", "校园卡", "体检", "缴费", "截止"],
+    "exclude_keywords": ["防诈骗", "反诈", "消防演练", "安全教育", "警示教育", "倡议书",
+                         "点赞", "投票", "转发", "征稿", "读后感", "节电节水", "光盘行动"],
+    "_排除说明": "宣传 / 提醒类一律不收（防诈骗、消防演练、安全教育、倡议书），纯宣传与拉票征稿类也不收。判断标准：这条信息是否需要学生「去办一件事」或「知道一个时间节点」。"
+  },
   "focus_audience": [
     "全校学生",
     "自动化学院学生",

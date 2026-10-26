@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>讲座雷达 · 公众号讲座信息汇总</title>
+<title>讲座雷达 · 广工讲座与学生事务汇总</title>
 <style>
   :root{
     --bg:#f6f6f3;
@@ -149,6 +149,11 @@
   .badge.aud{background:#f2f2fd;color:#4338ca;font-weight:500}
   .badge.col0{background:#eef5f3;color:#1f5c53;font-weight:600}
   .badge.col1{background:#eef4fc;color:#1d4ed8;font-weight:600}
+  /* 学生事务：倒计时状态与类型标记 */
+  .badge.due{background:#fde8e8;color:#c02626}
+  .badge.closed{background:#f0f0ec;color:var(--ink-3);font-weight:500}
+  .badge.open{background:var(--accent-soft);color:var(--accent)}
+  .badge.kindnotice{background:#fdf1e3;color:#b45309}
   .meta{display:flex;flex-direction:column;gap:2px;margin-bottom:7px}
   .meta div{font-size:12.5px;color:var(--ink-2);display:flex;gap:7px;align-items:baseline}
   .meta .k{color:var(--ink-3);flex:0 0 auto;min-width:32px}
@@ -167,6 +172,16 @@
   .cat.c2{border-color:#cfe0f4;background:#eef4fc;color:#1d4ed8}
   .cat.c3{border-color:#f4e0c7;background:#fdf4e8;color:#b45309}
   .cat.c4{border-color:#f3d3d8;background:#fdf0f2;color:#be123c}
+  /* 学生事务类别 */
+  .cat.c5{border-color:#f5d9c4;background:#fdf3ea;color:#b45309}
+  .cat.c6{border-color:#d6e4d0;background:#f2f8ef;color:#3f6212}
+  .cat.c7{border-color:#d5e3f0;background:#eef6fc;color:#0369a1}
+  .cat.c8{border-color:#e3d9f5;background:#f6f1fd;color:#6d28d9}
+  .cat.c9{border-color:#f3d9e0;background:#fdf2f5;color:#be123c}
+  .cat.c10{border-color:#e5e2d8;background:#f7f6f0;color:#57534e}
+  /* 事务类卡片用左侧色条区分，一眼能和讲座分开 */
+  .card.notice{border-left:3px solid #e8c9a0}
+  .card.notice.past{border-left-color:#e4e4de}
   .tag{font-size:10.5px;padding:1px 7px;border-radius:5px;background:#f3f4f1;color:var(--ink-2);border:1px solid #eaeae4}
   .src{font-size:11px;color:var(--ink-3);margin-left:auto;display:flex;gap:5px;align-items:center}
   .src a{color:var(--accent);text-decoration:none;border-bottom:1px dotted rgba(31,92,83,.4)}
@@ -249,7 +264,7 @@
 <div class="app">
 
   <aside class="side">
-    <div class="brand"><b>讲座雷达</b><span>广工 · 校内优先</span></div>
+    <div class="brand"><b>讲座雷达</b><span>广工 · 讲座为主 · 校内优先</span></div>
     <nav id="nav"></nav>
     <div class="sidefoot" id="sidefoot"></div>
   </aside>
@@ -284,7 +299,7 @@ const DATA = __LECTURES_JSON__;
 const META = __META_JSON__;
 
 const WEEK = ["周日","周一","周二","周三","周四","周五","周六"];
-const state = { nav:"all", q:"", view:"grid" };
+const state = { nav:"kind:activity", q:"", view:"grid" };
 
 function parseDate(s){
   if(!s) return null;
@@ -306,7 +321,18 @@ function daysFromToday(s){
 function esc(s){
   return (s||"").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 }
-const CAT_CLASS = {"学术报告":"c0","论坛会议":"c1","学术会议":"c2","宣讲招聘":"c3","学科竞赛":"c4","其他":""};
+const CAT_CLASS = {
+  // 讲座 / 活动
+  "学术报告":"c0","论坛会议":"c1","学术会议":"c2","宣讲招聘":"c3","学科竞赛":"c4","其他":"",
+  // 学生事务
+  "奖助学金":"c5","教务学籍":"c6","假期校历":"c7","就业实习":"c8","竞赛报名":"c9",
+  "生活服务":"c10","其他通知":"c10"
+};
+// 状态 → 徽章配色：临近截止标红，已截止标灰
+const STATUS_CLASS = {today:"today", due:"due", closed:"closed", open:"open"};
+const KIND_LABEL = META.kind_labels || {activity:"讲座与活动", notice:"学生事务"};
+const ACT_CATS = META.activity_categories || ["学术报告","学术会议","论坛会议","宣讲招聘","学科竞赛","其他"];
+const NOTICE_CATS = META.notice_categories || ["奖助学金","教务学籍","假期校历","就业实习","竞赛报名","生活服务","其他通知"];
 
 /* 面向学院列表：与「面向学院」导航共用同一份口径 */
 const COLLEGE_GROUPS = (META.college_groups && META.college_groups.length)
@@ -326,11 +352,21 @@ function gradAuds(r){
 
 /* ---------- nav ---------- */
 function navDefs(){
+  // 内容类型：讲座与活动是主线，学生事务是补充
+  const kindItems = [
+    {key:"kind:activity", label:KIND_LABEL.activity || "讲座与活动"},
+    {key:"kind:notice", label:KIND_LABEL.notice || "学生事务"}
+  ];
+
+  // 活动类型 / 通知类型分开列，各自按真实出现过的类别出条目
   const cats = {};
   DATA.forEach(r=>{ const c = r.category || "其他"; cats[c] = (cats[c]||0)+1; });
-  const order = ["学术报告","学术会议","论坛会议","宣讲招聘","学科竞赛","其他"];
-  const catItems = order.filter(c=>cats[c]).map(c=>({key:"cat:"+c, label:c}));
-  Object.keys(cats).forEach(c=>{ if(!order.includes(c)) catItems.push({key:"cat:"+c, label:c}); });
+  const actItems = ACT_CATS.filter(c=>cats[c]).map(c=>({key:"cat:"+c, label:c}));
+  const noticeItems = NOTICE_CATS.filter(c=>cats[c]).map(c=>({key:"cat:"+c, label:c}));
+  Object.keys(cats).forEach(c=>{
+    if(ACT_CATS.includes(c) || NOTICE_CATS.includes(c)) return;
+    actItems.push({key:"cat:"+c, label:c});
+  });
 
   // 范围：校内 / 校外 / 地点待确认
   const scopeItems = [];
@@ -355,8 +391,9 @@ function navDefs(){
   Object.keys(auds).forEach(a=>{ if(!audOrder.includes(a)) audItems.push({key:"aud:"+a, label:a}); });
 
   const groups = [
+    { title:"内容类型", items: kindItems },
     { title:"时间", items:[
-      {key:"all", label:"全部讲座"},
+      {key:"all", label:"全部内容"},
       {key:"today", label:"今天"},
       {key:"tomorrow", label:"明天"},
       {key:"week", label:"未来 7 天"},
@@ -369,7 +406,8 @@ function navDefs(){
   if(colItems.length) groups.push({ title:"面向学院", items: colItems });
   if(scopeItems.length) groups.push({ title:"参与范围", items: scopeItems });
   if(audItems.length) groups.push({ title:"受众身份", items: audItems });
-  groups.push({ title:"类型", items: catItems });
+  if(actItems.length) groups.push({ title:"活动类型", items: actItems });
+  if(noticeItems.length) groups.push({ title:"通知类型", items: noticeItems });
   groups.push({ title:"来源", items:[
     {key:"src:wechat", label:"公众号"},
     {key:"src:web", label:"学校官网"}
@@ -385,9 +423,14 @@ function baseMatch(r){
   }
   return true;
 }
+/* 有效日期：通知类优先看截止日期，活动看举办日期 */
+function effDate(r){ return r.deadline || r.date || ""; }
+
 function navMatch(r){
-  const k = state.nav, n = daysFromToday(r.date);
+  const k = state.nav, n = daysFromToday(effDate(r));
   if(k === "all") return true;
+  if(k === "kind:activity") return (r.kind || "activity") === "activity";
+  if(k === "kind:notice") return r.kind === "notice";
   if(k === "today") return n === 0;
   if(k === "tomorrow") return n === 1;
   if(k === "week") return n !== null && n >= 0 && n <= 7;
@@ -416,9 +459,10 @@ function countFor(key){
 }
 function rows(){
   return DATA.filter(r=>baseMatch(r) && navMatch(r)).sort((a,b)=>{
-    const oa = a.status === "past" ? 1 : 0, ob = b.status === "past" ? 1 : 0;
+    const oa = (a.status==="past" || a.status==="closed") ? 1 : 0;
+    const ob = (b.status==="past" || b.status==="closed") ? 1 : 0;
     if(oa !== ob) return oa - ob;
-    const da = parseDate(a.date), db = parseDate(b.date);
+    const da = parseDate(effDate(a)), db = parseDate(effDate(b));
     if(!da && !db) return 0;
     if(!da) return 1;
     if(!db) return -1;
@@ -428,16 +472,22 @@ function rows(){
 
 /* ---------- 组件 ---------- */
 function cardHTML(r){
-  const f = fmtDate(r.date);
-  const isPast = r.status === "past";
+  const isNotice = r.kind === "notice";
+  // 通知类没有举办日期，日期框显示截止日期
+  const dstr = isNotice ? (r.deadline || r.date) : r.date;
+  const f = fmtDate(dstr);
+  const isPast = r.status === "past" || r.status === "closed";
   const badges = [];
+  if(isNotice) badges.push('<span class="badge kindnotice">通知</span>');
   if(r.credit) badges.push(`<span class="badge credit">${esc(r.credit)}</span>`);
   if(r.is_new && !isPast) badges.push('<span class="badge new">新</span>');
-  if(!isPast && r.status !== "unknown") badges.push(`<span class="badge ${r.status==='today'?'today':''}">${esc(r.status_text)}</span>`);
-  if(isPast) badges.push('<span class="badge past">已结束</span>');
+  if(r.status && r.status !== "unknown") {
+    badges.push(`<span class="badge ${STATUS_CLASS[r.status]||""}">${esc(r.status_text)}</span>`);
+  }
 
   const meta = [];
   if(r.speaker) meta.push(`<div><span class="k">主讲</span><span class="v">${esc(r.speaker)}</span></div>`);
+  if(isNotice && r.deadline) meta.push(`<div><span class="k">截止</span><span class="v">${esc(r.deadline)}</span></div>`);
   if(r.time_text) meta.push(`<div><span class="k">时间</span><span class="v">${esc(r.time_text)}</span></div>`);
   if(r.location) meta.push(`<div><span class="k">地点</span><span class="v">${esc(r.location)}</span></div>`);
   if(r.org) meta.push(`<div><span class="k">主办</span><span class="v">${esc(r.org)}</span></div>`);
@@ -455,7 +505,7 @@ function cardHTML(r){
     : `<span class="title">${esc(r.title)}</span>`;
   const srcLink = r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">原文 ↗</a>` : "";
 
-  return `<article class="card ${isPast?'past':''}">
+  return `<article class="card${isNotice?' notice':''}${isPast?' past':''}">
     <div class="datebox ${isPast?'past':''}">
       <div class="m">${f.m}</div><div class="d">${f.d}</div><div class="w">${f.w}</div>
     </div>
@@ -470,11 +520,11 @@ function cardHTML(r){
 
 function tableHTML(list){
   const body = list.map(r=>{
-    const n = daysFromToday(r.date);
+    const n = daysFromToday(effDate(r));
     const dim = (n !== null && n < 0) ? ' style="color:var(--ink-3)"' : '';
     const tt = (r.time_text||"").replace(/^\d{4}年\d{1,2}月\d{1,2}日\s*/,"");
     return `<tr>
-      <td class="t">${esc((r.date||"待定").slice(5))}<br><span style="color:var(--ink-3)">${esc(tt)}</span></td>
+      <td class="t">${esc((effDate(r)||"待定").slice(5))}<br><span style="color:var(--ink-3)">${esc(tt)}</span></td>
       <td class="n"><a href="${esc(r.url||"#")}" target="_blank" rel="noopener"${dim}>${esc(r.title)}</a></td>
       <td><span class="cat ${CAT_CLASS[r.category||"其他"]||""}">${esc(r.category||"其他")}</span></td>
       <td>${r.credit?`<span class="badge credit">${esc(r.credit)}</span>`:'<span style="color:var(--ink-3)">—</span>'}</td>
@@ -483,7 +533,7 @@ function tableHTML(list){
     </tr>`;
   }).join("");
   return `<div class="tblwrap"><table>
-    <thead><tr><th>日期</th><th>讲座</th><th>类型</th><th>学分条</th><th>地点</th><th>主讲</th></tr></thead>
+    <thead><tr><th>日期 / 截止</th><th>标题</th><th>类型</th><th>学分条</th><th>地点</th><th>主讲</th></tr></thead>
     <tbody>${body}</tbody></table></div>`;
 }
 
@@ -500,6 +550,8 @@ function renderNav(){
 
 function navLabel(){
   const k = state.nav;
+  if(k === "kind:activity") return KIND_LABEL.activity || "讲座与活动";
+  if(k === "kind:notice") return KIND_LABEL.notice || "学生事务";
   if(k.startsWith("cat:")) return "类型 · " + k.slice(4);
   if(k.startsWith("aud:")) return "受众 · " + k.slice(4);
   if(k === "college:__other") return "面向学院 · 其他院系 / 全校";
@@ -510,7 +562,7 @@ function navLabel(){
   if(k === "scope:on") return "参与范围 · 校内讲座";
   if(k === "scope:off") return "参与范围 · 校外 / 外埠";
   if(k === "scope:unknown") return "参与范围 · 地点待确认";
-  return {all:"全部讲座", today:"今天", tomorrow:"明天", week:"未来 7 天", past:"已结束"}[k] || "全部讲座";
+  return {all:"全部内容", today:"今天", tomorrow:"明天", week:"未来 7 天", past:"已结束"}[k] || "全部内容";
 }
 
 function render(){
@@ -531,7 +583,7 @@ function render(){
   } else {
     const groups = [];
     list.forEach(r=>{
-      const key = r.date || "待定";
+      const key = effDate(r) || "待定";
       let g = groups.find(x=>x.key===key);
       if(!g){ g = {key, items:[]}; groups.push(g); }
       g.items.push(r);
@@ -546,7 +598,7 @@ function render(){
           <span class="dw">${f.w}</span>
           ${rel?`<span class="rel">${rel}</span>`:""}
           <span class="ln"></span>
-          <span class="dw">${g.items.length} 场</span>
+          <span class="dw">${g.items.length} 条</span>
         </div>
         <div class="tl">${g.items.map(cardHTML).join("")}</div>
       </div>`;
@@ -557,31 +609,34 @@ function render(){
 }
 
 function renderStats(){
-  const today = DATA.filter(r=>daysFromToday(r.date)===0).length;
-  const week = DATA.filter(r=>{const n=daysFromToday(r.date);return n!==null&&n>=0&&n<=7;}).length;
-  const credit = DATA.filter(r=>!!r.credit).length;
+  const act = DATA.filter(r=>(r.kind||"activity")==="activity").length;
+  const notice = DATA.filter(r=>r.kind==="notice").length;
+  const today = DATA.filter(r=>daysFromToday(effDate(r))===0).length;
+  const week = DATA.filter(r=>{const n=daysFromToday(effDate(r));return n!==null&&n>=0&&n<=7;}).length;
+  const due = DATA.filter(r=>r.status==="due").length;
   const fresh = DATA.filter(r=>r.is_new).length;
-  const oncampus = DATA.filter(r=>r.on_campus===true).length;
   document.getElementById("stats").innerHTML = `
-    <div class="stat"><div class="n">${oncampus}</div><div class="k">校内讲座</div></div>
-    <div class="stat"><div class="n ${today?'hot':''}">${today}</div><div class="k">今天开讲</div></div>
+    <div class="stat"><div class="n">${act}</div><div class="k">讲座与活动</div></div>
+    <div class="stat"><div class="n">${notice}</div><div class="k">学生事务</div></div>
+    <div class="stat"><div class="n ${today?'hot':''}">${today}</div><div class="k">今天</div></div>
     <div class="stat"><div class="n">${week}</div><div class="k">未来 7 天</div></div>
-    <div class="stat"><div class="n ${credit?'cr':''}">${credit}</div><div class="k">带学分条</div></div>
+    <div class="stat"><div class="n ${due?'hot':''}">${due}</div><div class="k">临近截止</div></div>
     <div class="stat"><div class="n ${fresh?'hot':''}">${fresh}</div><div class="k">24h 新增</div></div>`;
 }
 
 /* ---------- 简报 ---------- */
 function briefText(){
-  const rs = DATA.filter(r=>{const n=daysFromToday(r.date);return n===0||n===1;})
-    .sort((a,b)=>(parseDate(a.date)||0)-(parseDate(b.date)||0));
-  if(!rs.length) return "近两日没有已收录的讲座。";
-  const head = "【讲座提醒】" + new Date().toLocaleDateString("zh-CN") + "\n";
+  const rs = DATA.filter(r=>{const n=daysFromToday(effDate(r));return n===0||n===1;})
+    .sort((a,b)=>(parseDate(effDate(a))||0)-(parseDate(effDate(b))||0));
+  if(!rs.length) return "近两日没有已收录的讲座或截止事项。";
+  const head = "【今日提醒】" + new Date().toLocaleDateString("zh-CN") + "\n";
   return head + rs.map(r=>{
-    const p = [`${r.date||"待定"} ${(r.time_text||"").replace(/^\d{4}年\d{1,2}月\d{1,2}日\s*/,"")}`.trim()];
+    const tag = r.kind === "notice" ? "〔通知〕" : "";
+    const p = [`${effDate(r)||"待定"} ${(r.time_text||"").replace(/^\d{4}年\d{1,2}月\d{1,2}日\s*/,"")}`.trim()];
     if(r.speaker) p.push(r.speaker);
     if(r.location) p.push(r.location);
     if(r.credit) p.push("【"+r.credit+"】");
-    return `· ${r.title}\n  ${p.join(" | ")}`;
+    return `· ${tag}${r.title}\n  ${p.join(" | ")}`;
   }).join("\n");
 }
 
