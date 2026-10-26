@@ -94,6 +94,8 @@
     font-family:inherit;white-space:nowrap;transition:all .14s;
   }
   .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .btn.toggle.on{background:var(--credit);border-color:var(--credit);color:#fff}
+  .btn.toggle.on:hover{color:#fff}
 
   /* ---------- stats ---------- */
   .stats{display:flex;gap:30px;padding:18px 2px 2px;flex-wrap:wrap}
@@ -275,6 +277,7 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1b2330" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4.2-4.2"/></svg>
         <input id="q" type="search" placeholder="搜标题、主讲人、地点、主办…">
       </div>
+      <button class="btn toggle" id="creditBtn">有学分条</button>
       <div class="seg" id="views">
         <button data-view="grid" class="on">卡片</button>
         <button data-view="timeline">时间轴</button>
@@ -299,7 +302,7 @@ const DATA = __LECTURES_JSON__;
 const META = __META_JSON__;
 
 const WEEK = ["周日","周一","周二","周三","周四","周五","周六"];
-const state = { nav:"kind:activity", q:"", view:"grid" };
+const state = { nav:"kind:activity", q:"", view:"grid", credit:false };
 
 function parseDate(s){
   if(!s) return null;
@@ -351,6 +354,25 @@ function gradAuds(r){
 
 
 /* ---------- nav ---------- */
+/* 当前生效的内容类型：选了某个类别时，按该类别归属反推，
+   这样「内容类型」的高亮会跟着类别走，不会出现两个入口同时亮/都不亮 */
+function currentKind(){
+  const k = state.nav;
+  if(k === "kind:notice") return "notice";
+  if(k === "kind:activity") return "activity";
+  if(k.startsWith("cat:")){
+    const c = k.slice(4);
+    if(NOTICE_CATS.includes(c) && !ACT_CATS.includes(c)) return "notice";
+  }
+  return "activity";
+}
+
+/* 侧栏只放四组：内容类型 / 时间 / 面向 / 类型。
+   精简原则（2026-10-26 用户反馈「太乱了」）：
+     · 类别清单只列当前内容类型的那一套，两类混列会让组数翻倍；
+     · 「面向学院」与「受众身份」口径高度重叠，合并成「面向」一组；
+     · 受众里的自由文本（如「2027届毕业生」）不搬进导航，交给搜索框；
+     · 「学分条」只有一项，移到顶栏做开关；「参与范围」「来源」信息价值低，撤掉。 */
 function navDefs(){
   // 内容类型：讲座与活动是主线，学生事务是补充
   const kindItems = [
@@ -358,65 +380,40 @@ function navDefs(){
     {key:"kind:notice", label:KIND_LABEL.notice || "学生事务"}
   ];
 
-  // 活动类型 / 通知类型分开列，各自按真实出现过的类别出条目
+  // 类型：只出当前内容类型下真正出现过的类别
   const cats = {};
   DATA.forEach(r=>{ const c = r.category || "其他"; cats[c] = (cats[c]||0)+1; });
-  const actItems = ACT_CATS.filter(c=>cats[c]).map(c=>({key:"cat:"+c, label:c}));
-  const noticeItems = NOTICE_CATS.filter(c=>cats[c]).map(c=>({key:"cat:"+c, label:c}));
-  Object.keys(cats).forEach(c=>{
-    if(ACT_CATS.includes(c) || NOTICE_CATS.includes(c)) return;
-    actItems.push({key:"cat:"+c, label:c});
-  });
+  const catPool = currentKind() === "notice" ? NOTICE_CATS : ACT_CATS;
+  const catItems = catPool.filter(c=>cats[c]).map(c=>({key:"cat:"+c, label:c}));
 
-  // 范围：校内 / 校外 / 地点待确认
-  const scopeItems = [];
-  if(DATA.some(r=>r.on_campus===true)) scopeItems.push({key:"scope:on", label:"校内讲座"});
-  if(DATA.some(r=>r.on_campus===false)) scopeItems.push({key:"scope:off", label:"校外 / 外埠"});
-  if(DATA.some(r=>r.on_campus==null)) scopeItems.push({key:"scope:unknown", label:"地点待确认"});
-
-  // 面向学院：自动化 / 信工 两个独立入口（即使暂无数据也保留，便于持续投喂）
-  const colItems = COLLEGE_GROUPS.map(c=>({key:"college:"+c, label:"面向"+c}));
-  if(DATA.some(r=>!r.college)) colItems.push({key:"college:__other", label:"其他院系 / 全校"});
-
-  // 受众：字面标签 + 研究生按学院派生的两个入口
+  // 面向谁：全校 / 研究生 / 两个学院的研究生（派生入口 0 条也保留，便于持续投喂）
   const auds = {};
   DATA.forEach(r=>{
     String(r.audience||"").split("、").filter(Boolean).forEach(a=>{auds[a]=(auds[a]||0)+1;});
     gradAuds(r).forEach(a=>{auds[a]=(auds[a]||0)+1;});
   });
-  const audOrder = ["全校学生","研究生",...GRAD_LABELS,"本科生","教师"];
-  const audItems = audOrder.filter(a=>auds[a]).map(a=>({key:"aud:"+a, label:a}));
-  // 两个学院研究生入口常驻，0 条也不隐藏（与「面向学院」一致，便于持续投喂）
-  GRAD_LABELS.forEach(g=>{ if(!auds[g]) audItems.push({key:"aud:"+g, label:g}); });
-  Object.keys(auds).forEach(a=>{ if(!audOrder.includes(a)) audItems.push({key:"aud:"+a, label:a}); });
+  const audItems = [];
+  if(auds["全校学生"]) audItems.push({key:"aud:全校学生", label:"全校学生"});
+  if(auds["研究生"]) audItems.push({key:"aud:研究生", label:"研究生"});
+  GRAD_LABELS.forEach(g=>audItems.push({key:"aud:"+g, label:g}));
 
   const groups = [
     { title:"内容类型", items: kindItems },
     { title:"时间", items:[
-      {key:"all", label:"全部内容"},
+      {key:"all", label:"全部"},
       {key:"today", label:"今天"},
-      {key:"tomorrow", label:"明天"},
       {key:"week", label:"未来 7 天"},
       {key:"past", label:"已结束"}
     ]},
-    { title:"学分条", items:[
-      {key:"credit", label:"有学术条 / 实践条"}
-    ]}
+    { title:"面向", items: audItems }
   ];
-  if(colItems.length) groups.push({ title:"面向学院", items: colItems });
-  if(scopeItems.length) groups.push({ title:"参与范围", items: scopeItems });
-  if(audItems.length) groups.push({ title:"受众身份", items: audItems });
-  if(actItems.length) groups.push({ title:"活动类型", items: actItems });
-  if(noticeItems.length) groups.push({ title:"通知类型", items: noticeItems });
-  groups.push({ title:"来源", items:[
-    {key:"src:wechat", label:"公众号"},
-    {key:"src:web", label:"学校官网"}
-  ]});
+  if(catItems.length) groups.push({ title:"类型", items: catItems });
   return groups;
 }
 
 /* ---------- 过滤 ---------- */
 function baseMatch(r){
+  if(state.credit && !r.credit) return false;
   if(state.q){
     const hay = [r.title,r.speaker,r.location,r.org,r.source,r.category,(r.tags||[]).join(" "),r.summary].join(" ").toLowerCase();
     if(!hay.includes(state.q.toLowerCase())) return false;
@@ -539,11 +536,16 @@ function tableHTML(list){
 
 /* ---------- 渲染 ---------- */
 function renderNav(){
+  const ck = currentKind();
   document.getElementById("nav").innerHTML = navDefs().map(g=>{
-    const items = g.items.map(it=>`
-      <button class="navitem ${state.nav===it.key?'on':''}" data-nav="${esc(it.key)}">
+    const items = g.items.map(it=>{
+      // 「内容类型」的选中态跟着 currentKind 走（选类别时也能看出属于哪一类）
+      const on = it.key.startsWith("kind:") ? ck === it.key.slice(5) : state.nav === it.key;
+      return `
+      <button class="navitem ${on?'on':''}" data-nav="${esc(it.key)}">
         <span class="dot"></span><span>${esc(it.label)}</span><span class="cnt">${countFor(it.key)}</span>
-      </button>`).join("");
+      </button>`;
+    }).join("");
     return `<div class="navgroup"><h3>${esc(g.title)}</h3>${items}</div>`;
   }).join("");
 }
@@ -553,15 +555,8 @@ function navLabel(){
   if(k === "kind:activity") return KIND_LABEL.activity || "讲座与活动";
   if(k === "kind:notice") return KIND_LABEL.notice || "学生事务";
   if(k.startsWith("cat:")) return "类型 · " + k.slice(4);
-  if(k.startsWith("aud:")) return "受众 · " + k.slice(4);
-  if(k === "college:__other") return "面向学院 · 其他院系 / 全校";
-  if(k.startsWith("college:")) return "面向 · " + k.slice(8);
-  if(k === "src:wechat") return "来源 · 公众号";
-  if(k === "src:web") return "来源 · 学校官网";
+  if(k.startsWith("aud:")) return "面向 · " + k.slice(4);
   if(k === "credit") return "带学术条 / 实践条";
-  if(k === "scope:on") return "参与范围 · 校内讲座";
-  if(k === "scope:off") return "参与范围 · 校外 / 外埠";
-  if(k === "scope:unknown") return "参与范围 · 地点待确认";
   return {all:"全部内容", today:"今天", tomorrow:"明天", week:"未来 7 天", past:"已结束"}[k] || "全部内容";
 }
 
@@ -653,6 +648,13 @@ document.getElementById("views").addEventListener("click", e=>{
   const b = e.target.closest("button"); if(!b) return;
   [...document.querySelectorAll("#views button")].forEach(x=>x.classList.toggle("on", x===b));
   state.view = b.dataset.view; render();
+});
+/* 「有学分条」是个附加开关，和侧栏的单选导航互不冲突 */
+const creditBtn = document.getElementById("creditBtn");
+creditBtn.addEventListener("click", ()=>{
+  state.credit = !state.credit;
+  creditBtn.classList.toggle("on", state.credit);
+  renderNav(); render();
 });
 document.getElementById("copyBtn").addEventListener("click", async ()=>{
   const text = briefText();

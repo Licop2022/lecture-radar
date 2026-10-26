@@ -262,9 +262,17 @@ def infer_other_college(org="", source="", title=""):
     """识别「其他学院」：主办 / 来源 / 标题里出现、但不属于目标学院的学院名。
 
     如轻工化工学院主办的「轻化名师讲坛」——对自动化 / 信工的学生基本无用。
+
+    例外：org 里出现校级单位（研究生院 / 校团委 / 学生工作处…）时视为校级活动，
+    其他学院只是协办方，不按「其他学院」排除。
+    （2026-10-26 实例：「卓越大讲堂」org 写了「研究生院、校团委、土木与交通工程学院…」，
+      牵头是研究生院，属全校研究生可参加，不该被当成土木学院的活动。）
     """
     cfg = _cfg()
     groups = (cfg.get("college_scope") or {}).get("groups") or ["自动化学院", "信息工程学院"]
+    wide = (cfg.get("college_scope") or {}).get("campus_wide_hosts") or []
+    if any(w and w in (org or "") for w in wide):
+        return ""
     blob = " ".join([org or "", source or "", title or ""])
     hits = []
     for full in cfg.get("watchlist", {}).get("学院", []):
@@ -274,6 +282,20 @@ def infer_other_college(org="", source="", title=""):
         if short in blob and short not in hits:
             hits.append(short)
     return "、".join(hits)
+
+
+def infer_credit_series(title=""):
+    """用户已确认、固定带条的系列（config.known_credit_series）。
+
+    标题命中即视为有该条，不依赖原文标注。只在用户明确确认过之后才能加进配置。
+    """
+    cfg = _cfg()
+    for name, credit in (cfg.get("known_credit_series") or {}).items():
+        if name.startswith("_"):
+            continue
+        if name and name in (title or ""):
+            return credit
+    return ""
 
 
 def quality_ok(rec):
@@ -309,6 +331,9 @@ def normalize_record(raw):
         rec["credit"] = "学术条" if c else ""
     else:
         rec["credit"] = (c or "").strip()
+    # 已知系列默认带条（用户确认过的，如卓越大讲堂），原文没写也认
+    if not rec["credit"]:
+        rec["credit"] = infer_credit_series(rec["title"])
     # 内容类型：先定是「讲座活动」还是「学生事务」，再按类型选类别规则
     rec["kind"] = infer_kind(raw)
     if not rec.get("category"):
@@ -522,6 +547,9 @@ def cmd_render(args):
         if "other_college" not in rec:
             rec["other_college"] = infer_other_college(
                 rec.get("org", ""), rec.get("source", ""), rec.get("title", ""))
+        # 已知系列默认带条（如卓越大讲堂），兼容历史记录
+        if not rec.get("credit"):
+            rec["credit"] = infer_credit_series(rec.get("title", ""))
         rec["src_type"] = "wechat" if "mp.weixin.qq.com" in (rec.get("url") or "") else "web"
         d = r.get("date") or ""
         if rec["kind"] == "notice":
