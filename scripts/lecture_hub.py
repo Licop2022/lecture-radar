@@ -76,10 +76,17 @@ def load_config():
     return {}
 
 
-FIELDS = ["title", "speaker", "date", "time_text", "location", "org", "source", "url", "summary", "category", "audience", "college", "campus"]
+FIELDS = ["title", "speaker", "date", "time_text", "location", "org", "source", "url", "summary", "category", "audience", "college", "host_college", "campus"]
 
-# 面向学院判定：只认显式线索（学院名/品牌栏目/来源域名），命中位置最靠前者优先
-COLLEGE_MARKERS = {
+# 面向学院（college）：只在原文有明确「面向」表述时才认。
+# 主办方是谁 ≠ 只面向谁 —— 信工主办的论坛常常面向全校研究生报名。
+COLLEGE_FACING_MARKERS = {
+    "自动化学院": ["面向自动化学院", "自动化学院研究生", "自动化学院学生", "自动化学院全体", "自动化学院师生"],
+    "信息工程学院": ["面向信息工程学院", "信息工程学院研究生", "信息工程学院学生",
+                     "信息工程学院全体", "信息工程学院师生"],
+}
+# 主办 / 来源学院（host_college）：学院名、品牌栏目、栏目域名都算，只表示「谁办的」
+COLLEGE_HOST_MARKERS = {
     "自动化学院": ["自动化学院", "自动化学工", "汇智自动化", "自动化专业", "控制科学"],
     "信息工程学院": ["信息工程学院", "信工学院", "信研博学", "信息工程专业", "通信工程"],
 }
@@ -148,21 +155,40 @@ def infer_audience(text):
     return "、".join(hits)
 
 
-def infer_college(title="", org="", summary="", url=""):
-    """判断讲座面向哪个学院：自动化学院 / 信息工程学院 / 空串（其他院系或未标注）"""
-    blob = " ".join([title or "", org or "", summary or ""])
+def _match_first(blob, table):
+    """在文本中找出位置最靠前的关键词，返回它所属的学院名"""
     best, pos = "", None
-    for name, keys in COLLEGE_MARKERS.items():
+    for name, keys in table.items():
         for k in keys:
             i = blob.find(k)
             if i >= 0 and (pos is None or i < pos):
                 best, pos = name, i
-    if best:
-        return best
+    return best
+
+
+def infer_college(title="", summary=""):
+    """面向学院：只认「面向 XX 学院」这类明确表述。
+
+    无明确表述一律留空 —— 面向全校、面向其他院系、或原文没说，都不猜。
+    特别注意：**主办方不等于面向对象**。信工主办的论坛经常面向全校研究生报名，
+    所以这里不看主办单位（org）、不看品牌栏目、不看域名，那些归 host_college。
+    """
+    return _match_first(" ".join([title or "", summary or ""]), COLLEGE_FACING_MARKERS)
+
+
+def infer_host_college(title="", org="", source="", url=""):
+    """主办 / 来源学院：从主办单位、品牌栏目、来源与栏目域名判断。
+
+    只表示「谁办的」，不代表只面向谁 —— 看板的「面向学院」导航把它作为
+    「与该学院相关」的兜底，受众拆分（gradAuds）仍然只看 college。
+    """
+    name = _match_first(" ".join([title or "", org or "", source or ""]), COLLEGE_HOST_MARKERS)
+    if name:
+        return name
     host = re.sub(r"^https?://", "", url or "").split("/")[0].lower()
-    for h, name in COLLEGE_HOSTS.items():
+    for h, n in COLLEGE_HOSTS.items():
         if host.endswith(h):
-            return name
+            return n
     return ""
 
 
@@ -190,9 +216,12 @@ def normalize_record(raw):
     # 受众：原文未写明时按标题/摘要/主办显式线索推断
     if not rec["audience"]:
         rec["audience"] = infer_audience(" ".join([rec["title"], rec["summary"], rec["org"]]))
-    # 面向学院：导航里「自动化 / 信工」两个入口靠它分开
+    # 面向学院：只认明确「面向 X 学院」的表述，免得把主办方当成受众
     if not rec["college"]:
-        rec["college"] = infer_college(rec["title"], rec["org"], rec["summary"], rec["url"])
+        rec["college"] = infer_college(rec["title"], rec["summary"])
+    # 主办 / 来源学院：谁办的（不等于只面向谁）
+    if not rec["host_college"]:
+        rec["host_college"] = infer_host_college(rec["title"], rec["org"], rec["source"], rec["url"])
     # 日期兜底：从 time_text 里抠 YYYY-MM-DD 或 YYYY年M月D日
     if not rec["date"]:
         m = re.search(r"(\d{4})[-/年](\d{1,2})[-/月](\d{1,2})", rec["time_text"] or rec["title"])
@@ -318,8 +347,10 @@ def cmd_render(args):
             rec["audience"] = infer_audience(" ".join([
                 rec.get("title", ""), rec.get("summary", ""), rec.get("org", "")]))
         if not rec.get("college"):
-            rec["college"] = infer_college(rec.get("title", ""), rec.get("org", ""),
-                                           rec.get("summary", ""), rec.get("url", ""))
+            rec["college"] = infer_college(rec.get("title", ""), rec.get("summary", ""))
+        if not rec.get("host_college"):
+            rec["host_college"] = infer_host_college(rec.get("title", ""), rec.get("org", ""),
+                                                     rec.get("source", ""), rec.get("url", ""))
         rec["src_type"] = "wechat" if "mp.weixin.qq.com" in (rec.get("url") or "") else "web"
         d = r.get("date") or ""
         try:

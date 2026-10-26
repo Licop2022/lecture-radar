@@ -401,8 +401,9 @@ function navMatch(r){
     if(String(r.audience||"").includes(t)) return true;
     return gradAuds(r).includes(t);
   }
-  if(k === "college:__other") return !r.college;
-  if(k.startsWith("college:")) return r.college === k.slice(8);
+  if(k === "college:__other") return !r.college && !r.host_college;
+  // 「面向学院」入口：明确面向该学院的，或该学院主办的（主办方学生通常也能参加）
+  if(k.startsWith("college:")){ const c = k.slice(8); return r.college === c || r.host_college === c; }
   if(k.startsWith("cat:")) return (r.category || "其他") === k.slice(4);
   if(k === "src:wechat") return r.src_type === "wechat";
   if(k === "src:web") return r.src_type === "web";

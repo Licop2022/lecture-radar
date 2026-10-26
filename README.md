@@ -48,11 +48,15 @@ python scripts/lecture_hub.py render
 python scripts/lecture_hub.py list
 ```
 
-记录字段：`title` `speaker` `date`(YYYY-MM-DD) `time_text` `location` `org` `source` `url` `summary` `tags` `credit` `audience` `college`
+记录字段：`title` `speaker` `date`(YYYY-MM-DD) `time_text` `location` `org` `source` `url` `summary` `tags` `credit` `audience` `college` `host_college`
 
 - `credit`：可获得的「条」，如 `学术条`、`实践条`、`学术条、实践条`；没有则留空。
 - `audience`：面向群体，如 `研究生`、`全校学生、研究生`；原文无线索则留空，不做推测。
-- `college`：面向学院，仅填 `自动化学院` 或 `信息工程学院`；其他院系或无法确认时留空。
+- `college`：**面向**学院，仅当原文明确写了「面向自动化学院 / 面向信息工程学院」时才填；面向全校、面向其他院系、或原文没说，一律留空。
+- `host_college`：**主办 / 来源**学院，由 `org`、品牌栏目、栏目域名自动判定，无需手填。
+  两者不可混用：**主办方不等于面向对象** —— 信工主办的论坛常常面向全校研究生报名，
+  这时 `college` 必须留空、`host_college` 记为 `信息工程学院`，看板的
+  「面向学院」入口仍会把它归到信工，但受众入口（自动化 / 信工研究生）两个都算得到。
 - `campus` / `on_campus`：由 `location` 自动判定，无需手填。
 - 日期不确定时 `date` 留空，`time_text` 照抄原文表述。
 
