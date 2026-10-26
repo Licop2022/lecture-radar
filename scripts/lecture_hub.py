@@ -64,7 +64,8 @@ def load_db():
 def save_db(db):
     os.makedirs(os.path.dirname(DATA_PATH), exist_ok=True)
     db["lectures"].sort(key=lambda r: (r.get("date") or "9999-99-99", r.get("time_text") or ""))
-    with open(DATA_PATH, "w", encoding="utf-8") as f:
+    # newline="\n"：Windows 上默认会把 \n 转成 \r\n，导致每次写库都在 git 里产生全文 diff
+    with open(DATA_PATH, "w", encoding="utf-8", newline="\n") as f:
         json.dump(db, f, ensure_ascii=False, indent=2)
 
 
@@ -264,7 +265,7 @@ def cmd_add(args):
     save_db(db)
 
     os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
-    with open(LOG_PATH, "a", encoding="utf-8") as f:
+    with open(LOG_PATH, "a", encoding="utf-8", newline="\n") as f:
         f.write("%s  add=%d update=%d skip=%d total=%d\n" % (stamp, added, updated, skipped, len(db["lectures"])))
 
     print("新增 %d 条，更新 %d 条，跳过 %d 条，库内共 %d 条" % (added, updated, skipped, len(db["lectures"])))
@@ -362,7 +363,8 @@ def cmd_render(args):
     }
     html = tpl.replace("__LECTURES_JSON__", json.dumps(lectures, ensure_ascii=False))
     html = html.replace("__META_JSON__", json.dumps(meta, ensure_ascii=False))
-    with open(OUT_PATH, "w", encoding="utf-8") as f:
+    # 同上：统一用 LF，保证与仓库里的 index.html 字节一致
+    with open(OUT_PATH, "w", encoding="utf-8", newline="\n") as f:
         f.write(html)
     print("已渲染 %s（%d 条记录）" % (OUT_PATH, len(lectures)))
 

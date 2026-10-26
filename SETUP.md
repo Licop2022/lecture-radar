@@ -25,6 +25,12 @@ cd lecture-radar
 
 仓库是 public，clone 不需要登录。
 
+> 若 `clone` 报 `schannel: server closed abruptly (missing close_notify)`，**先别怀疑凭据或代理**——这是 Git for Windows 的 schannel 后端在该网络下走 HTTP/2 被中断。加一个参数即可：
+> ```bash
+> git -c http.version=HTTP/1.1 clone https://github.com/Licop2022/lecture-radar.git
+> cd lecture-radar && git config http.version HTTP/1.1   # 固化，后续 fetch/push 都走 1.1
+> ```
+
 ### 第 3 步：验证能跑
 
 ```bash
@@ -117,6 +123,7 @@ curl -s https://licop2022.github.io/lecture-radar/ | grep -c first_seen   # 数�
 
 | 现象 | 原因 | 处理 |
 | --- | --- | --- |
+| `git clone` 报 `schannel: server closed abruptly (missing close_notify)` | Git for Windows 的 schannel 后端走 HTTP/2 时被网络中断，**与凭据、代理无关** | `git -c http.version=HTTP/1.1 clone …`，进仓库后 `git config http.version HTTP/1.1` 固化 |
 | `git clone` 报 `schannel: failed to receive handshake` | 网络需要代理，但新克隆里还没有任何代理配置 | `HTTPS_PROXY=http://127.0.0.1:端口 git clone https://github.com/Licop2022/lecture-radar.git`，或先 `git config --global http.proxy http://127.0.0.1:端口` |
 | `找不到 Python 3.8+ 解释器` | Python 没装或没进 PATH | 重装并勾选 Add to PATH；或用 `py` 启动器 |
 | `推送失败` + `CONNECT tunnel failed` | 需要代理但没配 | `git config http.proxy http://127.0.0.1:端口` |
