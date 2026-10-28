@@ -19,3 +19,6 @@ data/archive/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# 采集临时文件
+.tmp/
